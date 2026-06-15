@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import Svg, { Path } from 'react-native-svg';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WalletProvider } from './src/lib/mwa';
 import { agentChat, agentConfigured, agentDeleteConversation, usd } from './src/lib/api';
@@ -20,13 +21,34 @@ import { MessageBubble } from './src/components/MessageBubble';
 import { Sidebar } from './src/components/Sidebar';
 import { ConnectWallet } from './src/components/ConnectWallet';
 import { MenuIcon } from './src/components/icons';
+import { Backdrop } from './src/components/Backdrop';
 import type { Conversation, GenerationResult, Message, ProposalDraft } from './src/types';
 
 const STUB_REPLY =
   'The agent is not live yet. Soon: I pick the right model for what you described, quote the exact price, and you approve it with one tap.';
 const OFFLINE_REPLY = 'The agent is unreachable right now — give it a moment and try again.';
 
-const SUGGESTIONS = ['A cinematic city at night', 'Narrate this in a calm voice', 'Lo-fi beat to study to', 'A logo for a coffee brand'];
+// Opener cards — identical to the web app: each names the best model for its
+// type + a sample prompt. `send` names the model so the agent proposes exactly
+// that; `prompt` is the human-readable line shown on the card.
+const SUGGESTIONS = [
+  { tag: 'Image', model: 'nano-banana-2', prompt: 'a paper crane, minimal logo style on cream', send: 'Create an image with nano-banana-2: a paper crane, minimal logo style on cream' },
+  { tag: 'Video', model: 'seedance-2.0', prompt: 'a lighthouse in a storm, 5 seconds', send: 'Make a 5-second video with seedance-2.0: a lighthouse in a storm' },
+  { tag: 'Voice', model: 'tts-1', prompt: 'read a line aloud in a calm, warm voice', send: 'Use tts-1 to read aloud: Welcome to GlianaAI — pay per result, no signup.' },
+  { tag: 'Music', model: 'music-2.6', prompt: 'a lo-fi track for a rainy night', send: 'Make a track with music-2.6: lo-fi beats for a rainy night' },
+  { tag: 'Animate', model: 'grok-imagine-video-1.5-preview', prompt: 'animate an image into a short clip', send: 'Animate my image into a short video with grok-imagine-video-1.5-preview (image-to-video) — I will attach the image' },
+  { tag: 'Transcribe', model: 'gpt-4o-transcribe', prompt: 'transcribe an audio file to text', send: 'Transcribe my audio file with gpt-4o-transcribe (speech-to-text) — I will attach the audio' },
+];
+
+// Per-category glyphs (16×16, fill=currentColor) — same paths as the web cards.
+const CAT_ICON: Record<string, string> = {
+  Image: 'M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v7A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7Zm1.5 0v4.94l2.3-2.3a.75.75 0 0 1 1.06 0L9 9.28l1.4-1.4a.75.75 0 0 1 1.06 0l1.04 1.05V4.5h-9ZM6 6.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z',
+  Video: 'M3.5 3h9A1.5 1.5 0 0 1 14 4.5v7A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7A1.5 1.5 0 0 1 3.5 3Zm3 2.75v4.5a.5.5 0 0 0 .77.42l3.5-2.25a.5.5 0 0 0 0-.84l-3.5-2.25a.5.5 0 0 0-.77.42Z',
+  Voice: 'M8 1.5A2.25 2.25 0 0 0 5.75 3.75v3a2.25 2.25 0 0 0 4.5 0v-3A2.25 2.25 0 0 0 8 1.5ZM4 7a.75.75 0 0 1 .75.75 3.25 3.25 0 0 0 6.5 0 .75.75 0 0 1 1.5 0 4.75 4.75 0 0 1-4 4.69v1.31a.75.75 0 0 1-1.5 0v-1.31A4.75 4.75 0 0 1 3.25 7.75.75.75 0 0 1 4 7Z',
+  Music: 'M12 2.5a.75.75 0 0 0-.93-.73l-5 1.25A.75.75 0 0 0 5.5 3.75v5.6A2.5 2.5 0 1 0 7 11.5V6.34l4-1v2.26A2.5 2.5 0 1 0 12.5 10V2.5Z',
+  Animate: 'M8 1.5l1.2 3.3L12.5 6 9.2 7.2 8 10.5 6.8 7.2 3.5 6l3.3-1.2L8 1.5Zm4.5 8l.55 1.45L14.5 11.5l-1.45.55L12.5 13.5l-.55-1.45L10.5 11.5l1.45-.55L12.5 9.5Z',
+  Transcribe: 'M3 4.25A.75.75 0 0 1 3.75 3.5h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 3 4.25Zm0 3.5A.75.75 0 0 1 3.75 7h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 3 7.75Zm.75 2.75a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5h-5Z',
+};
 
 export default function App() {
   return (
@@ -148,7 +170,7 @@ function Main() {
 
   return (
     <View style={styles.root}>
-      <View pointerEvents="none" style={styles.glow} />
+      <Backdrop />
 
       <Sidebar
         visible={sidebarOpen}
@@ -225,14 +247,27 @@ function Main() {
 function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   return (
     <ScrollView contentContainerStyle={styles.empty} keyboardShouldPersistTaps="handled">
+      <View style={styles.pill}>
+        <View style={styles.pillDot} />
+        <Text style={styles.pillText}>59 models · one prompt</Text>
+      </View>
       <Text style={styles.emptyTitle}>
-        What should we <Text style={styles.emptyAccent}>make?</Text>
+        What should we <Text style={styles.emptyAccent}>make</Text>?
       </Text>
-      <Text style={styles.emptySub}>59 models · one prompt · pay per result</Text>
-      <View style={styles.suggest}>
+      <Text style={styles.emptySub}>
+        Describe it. The agent picks the model, quotes the exact price, and you pay per result.
+      </Text>
+      <View style={styles.cards}>
         {SUGGESTIONS.map((s) => (
-          <Pressable key={s} style={styles.suggestChip} onPress={() => onPick(s)}>
-            <Text style={styles.suggestText}>{s}</Text>
+          <Pressable key={s.tag} style={styles.card} onPress={() => onPick(s.send)}>
+            <View style={styles.cardHead}>
+              <Svg width={14} height={14} viewBox="0 0 16 16" fill={colors.flameSoft}>
+                <Path d={CAT_ICON[s.tag]} />
+              </Svg>
+              <Text style={styles.cardTag}>{s.tag}</Text>
+            </View>
+            <Text style={styles.cardPrompt}>{s.prompt}</Text>
+            <Text style={styles.cardModel} numberOfLines={1}>{s.model}</Text>
           </Pressable>
         ))}
       </View>
@@ -246,15 +281,6 @@ const rid = () =>
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.ink },
-  glow: {
-    position: 'absolute',
-    top: -160,
-    right: -120,
-    width: 360,
-    height: 360,
-    borderRadius: 360,
-    backgroundColor: 'rgba(245,158,11,0.10)',
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -274,18 +300,36 @@ const styles = StyleSheet.create({
   list: { padding: space(4), paddingBottom: space(6) },
   typing: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   typingText: { color: colors.textFaint, fontSize: 13 },
-  empty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: space(6), gap: space(3) },
-  emptyTitle: { color: colors.text, fontSize: 30, fontWeight: '700', textAlign: 'center' },
+  empty: { flexGrow: 1, alignItems: 'center', paddingHorizontal: space(4), paddingTop: '12%', paddingBottom: space(6), gap: space(5) },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space(1.5),
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: radius.pill,
+    paddingHorizontal: space(3),
+    paddingVertical: space(1.5),
+  },
+  pillDot: { width: 6, height: 6, borderRadius: 6, backgroundColor: colors.flameSoft },
+  pillText: { color: colors.textDim, fontSize: 11 },
+  emptyTitle: { color: colors.text, fontSize: 32, fontWeight: '700', textAlign: 'center', letterSpacing: -0.5 },
   emptyAccent: { color: colors.flameSoft },
-  emptySub: { color: colors.textFaint, fontSize: 14 },
-  suggest: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2), justifyContent: 'center', marginTop: space(4) },
-  suggestChip: {
+  emptySub: { color: colors.textFaint, fontSize: 14, textAlign: 'center', maxWidth: 340, lineHeight: 21 },
+  cards: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2.5), width: '100%', maxWidth: 520, marginTop: space(2) },
+  card: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    minWidth: 150,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    paddingHorizontal: space(4),
-    paddingVertical: space(2.5),
+    borderRadius: radius.lg,
+    padding: space(4),
   },
-  suggestText: { color: colors.textDim, fontSize: 13 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: space(1.5) },
+  cardTag: { color: colors.flameSoft, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  cardPrompt: { color: colors.textDim, fontSize: 13.5, marginTop: space(2), lineHeight: 19 },
+  cardModel: { color: colors.textGhost, fontSize: 10, fontFamily: 'monospace', marginTop: space(2.5) },
 });
