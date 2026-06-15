@@ -91,12 +91,11 @@ export function FullscreenImage({ uri, visible, onClose }: { uri: string; visibl
             >
               <Animated.View>
                 <TapGestureHandler ref={doubleTapRef} numberOfTaps={2} onActivated={reset}>
-                  <Animated.View>
-                    <Image
-                      source={{ uri }}
-                      style={{ width, height: height * 0.8, transform: [{ translateX }, { translateY }, { scale }] }}
-                      contentFit="contain"
-                    />
+                  {/* Transform lives on the Animated.View — expo-image's <Image> is
+                      not an animated component, so Animated.Values on its own
+                      transform throw "translateX must be a number or percentage". */}
+                  <Animated.View style={{ transform: [{ translateX }, { translateY }, { scale }] }}>
+                    <Image source={{ uri }} style={{ width, height: height * 0.8 }} contentFit="contain" />
                   </Animated.View>
                 </TapGestureHandler>
               </Animated.View>
