@@ -29,7 +29,16 @@
       "expo-dev-client",
       "expo-image",
       "expo-video",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0a0a0d"
+        }
+      ]
     ]
   }
 }
