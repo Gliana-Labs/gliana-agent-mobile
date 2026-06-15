@@ -91,15 +91,27 @@ export interface AgentTurn {
 
 export const agentConfigured = Boolean(AGENT);
 
+// Marks requests as coming from the native app so the worker takes the mobile
+// gate (Play Integrity) instead of the web gate (Turnstile). `integrityToken`
+// is the Google Play Integrity attestation (Android) once wired — the worker
+// only enforces it when PLAY_INTEGRITY_* is configured server-side.
+function mobileHeaders(integrityToken?: string): Record<string, string> {
+  return {
+    'content-type': 'application/json',
+    'x-gliana-client': 'mobile/1',
+    ...(integrityToken ? { 'x-gliana-integrity': integrityToken } : {}),
+  };
+}
+
 export async function agentChat(
   conversationId: string,
   message: string,
-  turnstileToken?: string,
+  integrityToken?: string,
 ): Promise<AgentTurn> {
   const res = await fetch(`${AGENT}/v1/chat`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ conversationId, message, turnstileToken }),
+    headers: mobileHeaders(integrityToken),
+    body: JSON.stringify({ conversationId, message }),
   });
   if (!res.ok) throw new Error(`agent: ${res.status}`);
   return (await res.json()) as AgentTurn;
@@ -108,5 +120,8 @@ export async function agentChat(
 /** Wipe the server-side copy (the agent's DO) of a deleted conversation. */
 export async function agentDeleteConversation(conversationId: string): Promise<void> {
   if (!AGENT) return;
-  await fetch(`${AGENT}/v1/chat/${conversationId}`, { method: 'DELETE' }).catch(() => {});
+  await fetch(`${AGENT}/v1/chat/${conversationId}`, {
+    method: 'DELETE',
+    headers: { 'x-gliana-client': 'mobile/1' },
+  }).catch(() => {});
 }
