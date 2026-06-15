@@ -12,6 +12,7 @@ import { useWallet } from '../lib/mwa';
 import { colors, radius, space } from '../theme';
 import { SchemaFields } from './SchemaFields';
 import { WalletIcon } from './icons';
+import { ModelPicker } from './ModelPicker';
 import type { GenerationResult, ProposalDraft } from '../types';
 
 export function ProposalCard({
@@ -26,6 +27,8 @@ export function ProposalCard({
   onApproved: (result: GenerationResult) => void;
 }) {
   const { account, connect, connecting, signer } = useWallet();
+  const [model, setModel] = useState(draft?.model ?? proposal.model);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [schema, setSchema] = useState<ModelSchema | null>(null);
   const [values, setValues] = useState<Record<string, unknown>>(() => ({
     ...proposal.input,
@@ -37,13 +40,14 @@ export function ProposalCard({
 
   useEffect(() => {
     let alive = true;
-    fetchSchema(proposal.model)
+    setSchema(null);
+    fetchSchema(model)
       .then((s) => alive && setSchema(s))
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [proposal.model]);
+  }, [model]);
 
   // Re-quote when a billing-relevant field changes (text length / duration /
   // resolution tier) so the shown price equals what /v1/infer will charge.
@@ -55,14 +59,13 @@ export function ProposalCard({
       duration: typeof values.duration === 'number' ? values.duration : undefined,
       resolution: typeof values.resolution === 'string' ? values.resolution : undefined,
     };
-    if (!params.text && !params.duration && !params.resolution) return;
     const t = setTimeout(() => {
-      quote(proposal.model, params)
+      quote(model, params)
         .then((next) => id === reqRef.current && setQ(next))
         .catch(() => {});
-    }, 350);
+    }, 250);
     return () => clearTimeout(t);
-  }, [proposal.model, values.text, values.duration, values.resolution]);
+  }, [model, values.text, values.duration, values.resolution]);
 
   function setField(key: string, value: unknown) {
     setValues((v) => {
@@ -72,13 +75,25 @@ export function ProposalCard({
     });
   }
 
+  // Switch model (from the picker): re-seed inputs (the agent's input only fits
+  // its own model) and re-fetch schema + price via the effects above.
+  function onSelectModel(id: string) {
+    if (id === model) return;
+    setModel(id);
+    const reset = id === proposal.model ? { ...proposal.input } : {};
+    setValues(reset);
+    setStatus('idle');
+    setError(null);
+    onDraft({ model: id, fields: reset });
+  }
+
   const body = useMemo(() => {
-    const out: Record<string, unknown> = { model: proposal.model };
+    const out: Record<string, unknown> = { model };
     for (const [k, v] of Object.entries(values)) {
       if (v !== undefined && v !== '') out[k] = v;
     }
     return out;
-  }, [proposal.model, values]);
+  }, [model, values]);
 
   async function pay() {
     if (!signer) {
@@ -101,10 +116,18 @@ export function ProposalCard({
   return (
     <View style={styles.card}>
       <View style={styles.head}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.model} numberOfLines={1}>{proposal.model}</Text>
+        <Pressable
+          style={{ flex: 1, minWidth: 0 }}
+          onPress={() => setPickerOpen(true)}
+          disabled={status === 'paying' || status === 'done'}
+        >
           <Text style={styles.cat}>{proposal.category}</Text>
-        </View>
+          <View style={styles.modelRow}>
+            <Text style={styles.model} numberOfLines={1}>{model}</Text>
+            <Text style={styles.chevron}>▾</Text>
+          </View>
+          <Text style={styles.changeHint}>tap to change</Text>
+        </Pressable>
         <View style={styles.priceBox}>
           <Text style={styles.price}>{usd(q.costMicroUsd)}</Text>
           <Text style={styles.priceUnit}>{q.units > 1 ? `${q.units} × ${q.unit}` : q.unit}</Text>
@@ -122,7 +145,7 @@ export function ProposalCard({
       )}
 
       <Pressable
-        onPress={() => Linking.openURL(`https://ai.glianalabs.com/models/${proposal.model}`)}
+        onPress={() => Linking.openURL(`https://ai.glianalabs.com/models/${model}`)}
         style={styles.detailsLink}
       >
         <Text style={styles.detailsText}>View model details ↗</Text>
@@ -158,6 +181,14 @@ export function ProposalCard({
           Paying from {account.address.slice(0, 4)}…{account.address.slice(-4)} · USDC on Solana
         </Text>
       )}
+
+      <ModelPicker
+        visible={pickerOpen}
+        category={proposal.category}
+        current={model}
+        onSelect={onSelectModel}
+        onClose={() => setPickerOpen(false)}
+      />
     </View>
   );
 }
@@ -193,8 +224,11 @@ const styles = StyleSheet.create({
     padding: space(4),
   },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: space(3) },
-  model: { color: colors.text, fontSize: 15, fontWeight: '600', fontFamily: 'monospace' },
-  cat: { color: colors.textFaint, fontSize: 12, marginTop: 2, textTransform: 'capitalize' },
+  cat: { color: colors.flameSoft, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  modelRow: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), marginTop: 3 },
+  model: { color: colors.text, fontSize: 15, fontWeight: '600', fontFamily: 'monospace', flexShrink: 1 },
+  chevron: { color: colors.textFaint, fontSize: 12 },
+  changeHint: { color: colors.textGhost, fontSize: 10, marginTop: 2 },
   priceBox: { alignItems: 'flex-end' },
   price: { color: colors.flameSoft, fontSize: 18, fontWeight: '700', fontFamily: 'monospace' },
   priceUnit: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
