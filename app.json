@@ -1,17 +1,23 @@
 {
   "expo": {
-    "name": "gliana-agent-mobile",
+    "name": "Gliana Agent",
     "slug": "gliana-agent-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "scheme": "glianaagent",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0a0a0d",
+    "primaryColor": "#f59e0b",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.glianalabs.agent"
     },
     "android": {
+      "package": "com.glianalabs.agent",
+      "userInterfaceStyle": "dark",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0a0a0d",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -20,6 +26,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-image",
+      "expo-video",
+      "expo-audio"
+    ]
   }
 }

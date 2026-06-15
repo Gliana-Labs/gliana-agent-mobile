@@ -1,3 +1,6 @@
+// Polyfills first — the Solana stack touches crypto/Buffer at import time.
+import './src/polyfills';
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';
