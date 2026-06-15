@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path } from 'react-native-svg';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WalletProvider } from './src/lib/mwa';
 import { agentChat, agentConfigured, agentDeleteConversation, usd } from './src/lib/api';
@@ -52,12 +53,14 @@ const CAT_ICON: Record<string, string> = {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <StatusBar style="light" />
-      <WalletProvider>
-        <Main />
-      </WalletProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <WalletProvider>
+          <Main />
+        </WalletProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

@@ -30,7 +30,9 @@ import { Buffer } from 'buffer';
 const APP_IDENTITY = {
   name: 'Gliana Agent',
   uri: 'https://agent.glianalabs.com',
-  icon: 'favicon.ico',
+  // Relative to `uri` → https://agent.glianalabs.com/icon-512.png. A PNG (not
+  // .ico) so the wallet's approval sheet can actually render the app icon.
+  icon: 'icon-512.png',
 };
 
 const CHAIN = 'solana:mainnet' as const;

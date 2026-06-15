@@ -164,7 +164,10 @@ export function ProposalCard({
           style={[styles.payBtn, styles.payActive, (status === 'paying' || connecting) && styles.payBusy]}
         >
           {status === 'paying' || connecting ? (
-            <ActivityIndicator color="#0a0a0d" />
+            <>
+              <ActivityIndicator color="#0a0a0d" />
+              <Text style={styles.payText}>{connecting ? 'Connecting wallet…' : 'Paying & generating…'}</Text>
+            </>
           ) : !account ? (
             <>
               <WalletIcon size={16} color="#0a0a0d" />

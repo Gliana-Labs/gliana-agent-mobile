@@ -35,6 +35,12 @@ export const WalletIcon = ({ size = 16, color }: P) => (
   </Svg>
 );
 
+export const DownloadIcon = ({ size = 16, color }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={base(color)} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+  </Svg>
+);
+
 export const PlayIcon = ({ size = 18, color }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={base(color)}>
     <Path d="M8 5v14l11-7z" />

@@ -1,15 +1,22 @@
 /**
- * Renders a paid generation's output: image, video, audio, or raw JSON.
- * expo-image / expo-video / expo-audio each need their hook called
+ * Renders a paid generation's output (image / video / audio / raw JSON) plus a
+ * Save button. expo-image / expo-video / expo-audio each need their hook called
  * unconditionally, so video + audio live in their own sub-components.
+ *
+ * Save = download the file to cache, then open the OS share sheet (expo-sharing)
+ * — that gives "Save Image" / "Save to Files" / share, works for every media
+ * type, and needs no storage permission.
  */
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { colors, radius, space } from '../theme';
-import { PauseIcon, PlayIcon } from './icons';
+import { DownloadIcon, PauseIcon, PlayIcon } from './icons';
+import { FullscreenImage } from './FullscreenImage';
 import type { GenerationResult } from '../types';
 
 export function MediaView({ result }: { result: GenerationResult }) {
@@ -22,16 +29,68 @@ export function MediaView({ result }: { result: GenerationResult }) {
     );
   }
   const kind = mediaKind(contentType, url);
-  if (kind === 'image') {
-    return <Image source={{ uri: url }} style={styles.image} contentFit="contain" transition={200} />;
-  }
-  if (kind === 'video') return <VideoResult uri={url} />;
-  if (kind === 'audio') return <AudioResult uri={url} />;
+  const media =
+    kind === 'image' ? (
+      <ImageResult uri={url} />
+    ) : kind === 'video' ? (
+      <VideoResult uri={url} />
+    ) : kind === 'audio' ? (
+      <AudioResult uri={url} />
+    ) : (
+      <Pressable style={styles.linkBox} onPress={() => Linking.openURL(url)}>
+        <Text style={styles.linkText}>Open output ↗</Text>
+      </Pressable>
+    );
+
   return (
-    <Pressable style={styles.linkBox} onPress={() => Linking.openURL(url)}>
-      <Text style={styles.linkText}>Open output ↗</Text>
+    <View style={{ gap: space(2.5) }}>
+      {media}
+      <SaveButton url={url} contentType={contentType} />
+    </View>
+  );
+}
+
+function SaveButton({ url, contentType }: { url: string; contentType?: string }) {
+  const [saving, setSaving] = useState(false);
+  async function onSave() {
+    setSaving(true);
+    try {
+      const ext = extFor(contentType, url);
+      const target = `${FileSystem.cacheDirectory}gliana-${Date.now()}.${ext}`;
+      const { uri } = await FileSystem.downloadAsync(url, target);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: contentType || undefined, dialogTitle: 'Save or share' });
+      } else {
+        await Linking.openURL(url);
+      }
+    } catch {
+      await Linking.openURL(url).catch(() => {});
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <Pressable style={styles.save} onPress={onSave} disabled={saving}>
+      {saving ? (
+        <ActivityIndicator size="small" color={colors.flameSoft} />
+      ) : (
+        <DownloadIcon size={15} color={colors.flameSoft} />
+      )}
+      <Text style={styles.saveText}>{saving ? 'Preparing…' : 'Save / Share'}</Text>
     </Pressable>
   );
+}
+
+function extFor(ct: string | undefined, url: string): string {
+  const t = (ct ?? '').toLowerCase();
+  const map: Record<string, string> = {
+    'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif',
+    'video/mp4': 'mp4', 'video/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/wav': 'wav',
+    'audio/ogg': 'ogg', 'audio/mp4': 'm4a',
+  };
+  if (map[t]) return map[t];
+  const ext = url.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+  return /^[a-z0-9]{2,4}$/.test(ext) ? ext : 'bin';
 }
 
 function mediaKind(ct: string | undefined, url: string): 'image' | 'video' | 'audio' | 'file' {
@@ -46,6 +105,21 @@ function mediaKind(ct: string | undefined, url: string): 'image' | 'video' | 'au
   return 'file';
 }
 
+function ImageResult({ uri }: { uri: string }) {
+  const [zoom, setZoom] = useState(false);
+  return (
+    <>
+      <Pressable onPress={() => setZoom(true)}>
+        <Image source={{ uri }} style={styles.image} contentFit="contain" transition={200} />
+        <View style={styles.zoomBadge}>
+          <Text style={styles.zoomBadgeText}>Tap to zoom</Text>
+        </View>
+      </Pressable>
+      <FullscreenImage uri={uri} visible={zoom} onClose={() => setZoom(false)} />
+    </>
+  );
+}
+
 function VideoResult({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
@@ -56,14 +130,12 @@ function VideoResult({ uri }: { uri: string }) {
 function AudioResult({ uri }: { uri: string }) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
-  const [touched, setTouched] = useState(false);
   const playing = status.playing;
 
   function toggle() {
-    setTouched(true);
     if (playing) player.pause();
     else {
-      if (touched && status.didJustFinish) player.seekTo(0);
+      if (status.didJustFinish) player.seekTo(0);
       player.play();
     }
   }
@@ -78,6 +150,16 @@ function AudioResult({ uri }: { uri: string }) {
 
 const styles = StyleSheet.create({
   image: { width: '100%', aspectRatio: 1, borderRadius: radius.lg, backgroundColor: colors.ink2 },
+  zoomBadge: {
+    position: 'absolute',
+    right: space(2.5),
+    bottom: space(2.5),
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: radius.pill,
+    paddingHorizontal: space(2.5),
+    paddingVertical: space(1),
+  },
+  zoomBadgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
   video: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.lg, backgroundColor: '#000' },
   audio: {
     flexDirection: 'row',
@@ -98,6 +180,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   audioLabel: { color: colors.textDim, fontSize: 14 },
+  save: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space(2),
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingVertical: space(2.5),
+  },
+  saveText: { color: colors.flameSoft, fontSize: 13, fontWeight: '600' },
   rawBox: { backgroundColor: colors.ink2, borderRadius: radius.md, padding: space(3) },
   rawText: { color: colors.textDim, fontFamily: 'monospace', fontSize: 12 },
   linkBox: {
