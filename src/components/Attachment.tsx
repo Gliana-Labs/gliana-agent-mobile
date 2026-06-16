@@ -14,10 +14,8 @@ import { colors, radius, space } from '../theme';
 
 export type AttachKind = 'image' | 'audio' | 'video';
 
-// Base64 inflates ~4/3 and the gateway caps inline bodies ~1 MB.
-const MAX_BYTES = 700_000;
-// Video can't go inline — it's streamed to R2 via POST /v1/media (40 MB cap).
-const MAX_VIDEO_BYTES = 40_000_000;
+// Every attachment streams to R2 via POST /v1/media (40 MB cap) — no inline base64.
+const MAX_UPLOAD_BYTES = 40_000_000;
 
 function isUrl(v: unknown): v is string {
   return typeof v === 'string' && /^https?:\/\//.test(v);
@@ -38,74 +36,21 @@ export function Attachment({
 }) {
   const [reading, setReading] = useState(false);
   const [error, setError] = useState('');
-  const hasFile = typeof value === 'string' && value.length > 0 && !isUrl(value);
+  const hasValue = typeof value === 'string' && value.length > 0;
   // Surface upload/read progress so the parent can disable pay while it runs.
   useEffect(() => {
     onBusy?.(reading);
   }, [reading, onBusy]);
 
-  async function pickImage() {
-    setError('');
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      setError('Allow photo access to attach an image.');
-      return;
-    }
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      base64: true,
-      quality: 0.9,
-    });
-    if (res.canceled || !res.assets?.[0]) return;
-    const a = res.assets[0];
-    if ((a.fileSize ?? 0) > MAX_BYTES) {
-      setError('Image must be under ~700 KB — pick a smaller one.');
-      return;
-    }
-    if (a.base64) onChange(a.base64);
-  }
-
-  async function pickFile() {
-    setError('');
-    const res = await DocumentPicker.getDocumentAsync({
-      type: kind === 'video' ? 'video/*' : 'audio/*',
-      copyToCacheDirectory: true,
-    });
-    if (res.canceled || !res.assets?.[0]) return;
-    const a = res.assets[0];
-    if ((a.size ?? 0) > MAX_BYTES) {
-      // Big media (esp. video) can't go inline — tell the user to paste a URL.
-      setError(`Too big to upload inline (≤700 KB). Paste a ${kind} URL instead.`);
-      return;
-    }
+  // Upload any picked file to R2 (POST /v1/media) → hosted URL. No base64, so the
+  // cap is 40 MB for every kind (not the old ~700 KB inline-body limit).
+  async function uploadAsset(uri: string, mime: string) {
     setReading(true);
     try {
-      const b64 = await FileSystem.readAsStringAsync(a.uri, { encoding: 'base64' });
-      onChange(b64);
-    } catch {
-      setError('Could not read that file — try another.');
-    } finally {
-      setReading(false);
-    }
-  }
-
-  // Video: pick a file and STREAM it to R2 (POST /v1/media) — too big for inline
-  // base64. Returns a hosted URL we set as the value.
-  async function uploadVideo() {
-    setError('');
-    const res = await DocumentPicker.getDocumentAsync({ type: 'video/*', copyToCacheDirectory: true });
-    if (res.canceled || !res.assets?.[0]) return;
-    const a = res.assets[0];
-    if ((a.size ?? 0) > MAX_VIDEO_BYTES) {
-      setError('Video must be under 40 MB — or paste a URL.');
-      return;
-    }
-    setReading(true);
-    try {
-      const up = await FileSystem.uploadAsync(`${API}/v1/media`, a.uri, {
+      const up = await FileSystem.uploadAsync(`${API}/v1/media`, uri, {
         httpMethod: 'POST',
         uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        headers: { 'content-type': a.mimeType || 'video/mp4' },
+        headers: { 'content-type': mime },
       });
       const url = up.status >= 200 && up.status < 300 ? (JSON.parse(up.body).url as string) : null;
       if (!url) throw new Error('upload failed');
@@ -117,47 +62,65 @@ export function Attachment({
     }
   }
 
-  const pick = kind === 'image' ? pickImage : kind === 'video' ? uploadVideo : pickFile;
-  const noun = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : 'File';
-  const pickLabel = reading
-    ? kind === 'video'
-      ? 'Uploading…'
-      : 'Reading…'
-    : hasFile || (kind === 'video' && isUrl(value))
-      ? `${noun} attached ✓ — pick another`
-      : kind === 'image'
-        ? 'Attach an image (≤700 KB)'
-        : kind === 'video'
-          ? 'Upload a video (≤40 MB) — or paste a URL below'
-          : 'Attach the audio file to transcribe (≤700 KB)';
+  async function pickImage() {
+    setError('');
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      setError('Allow photo access to attach an image.');
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
+    if (res.canceled || !res.assets?.[0]) return;
+    const a = res.assets[0];
+    if ((a.fileSize ?? 0) > MAX_UPLOAD_BYTES) {
+      setError('Image must be under 40 MB.');
+      return;
+    }
+    await uploadAsset(a.uri, a.mimeType || 'image/jpeg');
+  }
 
-  // Video now supports upload (streamed to R2) AND URL — show both.
-  const urlOnly = false;
+  async function pickFile() {
+    setError('');
+    const res = await DocumentPicker.getDocumentAsync({
+      type: kind === 'video' ? 'video/*' : 'audio/*',
+      copyToCacheDirectory: true,
+    });
+    if (res.canceled || !res.assets?.[0]) return;
+    const a = res.assets[0];
+    if ((a.size ?? 0) > MAX_UPLOAD_BYTES) {
+      setError('File must be under 40 MB — or paste a URL.');
+      return;
+    }
+    await uploadAsset(a.uri, a.mimeType || (kind === 'video' ? 'video/mp4' : 'audio/mpeg'));
+  }
+
+  const pick = kind === 'image' ? pickImage : pickFile;
+  const noun = kind === 'image' ? 'image' : kind === 'video' ? 'video' : 'audio file';
+  const article = kind === 'image' ? 'an' : 'a';
+  const pickLabel = reading
+    ? 'Uploading…'
+    : hasValue
+      ? `${noun[0].toUpperCase()}${noun.slice(1)} attached ✓ — upload another`
+      : `Upload ${article} ${noun} (≤40 MB)`;
 
   return (
     <View style={{ gap: space(2) }}>
-      {!urlOnly && (
-        <>
-          <Pressable style={styles.drop} onPress={pick} disabled={disabled || reading}>
-            {reading ? <ActivityIndicator size="small" color={colors.flameSoft} /> : null}
-            <Text style={styles.dropText}>{pickLabel}</Text>
-          </Pressable>
+      <Pressable style={styles.drop} onPress={pick} disabled={disabled || reading}>
+        {reading ? <ActivityIndicator size="small" color={colors.flameSoft} /> : null}
+        <Text style={styles.dropText}>{pickLabel}</Text>
+      </Pressable>
 
-          <View style={styles.orRow}>
-            <View style={styles.hr} />
-            <Text style={styles.orText}>or paste a URL</Text>
-            <View style={styles.hr} />
-          </View>
-        </>
-      )}
-
-      {urlOnly && <Text style={styles.dropText}>Paste a link to your source video (MP4 URL):</Text>}
+      <View style={styles.orRow}>
+        <View style={styles.hr} />
+        <Text style={styles.orText}>or paste a URL</Text>
+        <View style={styles.hr} />
+      </View>
 
       <TextInput
         style={styles.url}
         value={isUrl(value) ? value : ''}
         onChangeText={(t) => onChange(t.trim() || undefined)}
-        placeholder={urlOnly ? 'https://…/video.mp4' : 'https://…'}
+        placeholder={kind === 'video' ? 'https://…/video.mp4' : 'https://…'}
         placeholderTextColor={colors.textGhost}
         autoCapitalize="none"
         autoCorrect={false}
