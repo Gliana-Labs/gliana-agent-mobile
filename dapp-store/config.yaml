@@ -1,0 +1,43 @@
+# Solana dApp Store publishing config. Fill in the TODOs, then mint with the
+# dApp Store CLI (see ../PUBLISHING.md). Keypair JSONs in this dir are gitignored.
+publisher:
+  name: Gliana Labs
+  website: https://glianalabs.com
+  email: contact@glianalabs.com
+  media:
+    - purpose: icon
+      uri: ../assets/icon.png
+
+app:
+  name: Gliana Agent
+  android_package: com.glianalabs.agent
+  urls:
+    license_url: https://glianalabs.com/terms
+    copyright_url: https://glianalabs.com
+    privacy_policy_url: https://glianalabs.com/privacy # TODO: ensure this page exists
+    website: https://agent.glianalabs.com
+  media:
+    - purpose: icon
+      uri: ../assets/icon.png
+
+release:
+  address: # filled by the CLI on `create release`
+  media:
+    # TODO: add ≥4 phone screenshots captured from the Seeker
+    - purpose: screenshot
+      uri: ./media/screenshot-1.png
+  files: []
+  catalog:
+    en-US:
+      name: Gliana Agent
+      short_description: Generate images, video, voice & music — pay per result from your wallet.
+      long_description: >
+        Gliana Agent picks the right AI model for what you describe, quotes the exact
+        price, and you approve it with one tap — paid in USDC from your Solana wallet
+        via Mobile Wallet Adapter. 59 models across image, video, voice, music,
+        animate and transcribe. No signup, no API key, no subscription — you only pay
+        for what you generate.
+      new_in_version: First release.
+      saga_features: Pay-per-result with Mobile Wallet Adapter (Seed Vault).
+      android_details:
+        - TODO
