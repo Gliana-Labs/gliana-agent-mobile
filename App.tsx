@@ -38,6 +38,7 @@ const SUGGESTIONS = [
   { tag: 'Voice', model: 'tts-1', prompt: 'read a line aloud in a calm, warm voice', send: 'Use tts-1 to read aloud: Welcome to GlianaAI — pay per result, no signup.' },
   { tag: 'Music', model: 'music-2.6', prompt: 'a lo-fi track for a rainy night', send: 'Make a track with music-2.6: lo-fi beats for a rainy night' },
   { tag: 'Animate', model: 'grok-imagine-video-1.5-preview', prompt: 'animate an image into a short clip', send: 'Animate my image into a short video with grok-imagine-video-1.5-preview (image-to-video) — I will attach the image' },
+  { tag: 'Edit video', model: 'aleph-2', prompt: 'restyle a clip to golden-hour', send: 'Edit my video with aleph-2 (video-to-video): make it a golden-hour sunset with warm lighting — I will attach the video' },
   { tag: 'Transcribe', model: 'gpt-4o-transcribe', prompt: 'transcribe an audio file to text', send: 'Transcribe my audio file with gpt-4o-transcribe (speech-to-text) — I will attach the audio' },
 ];
 
@@ -49,6 +50,7 @@ const CAT_ICON: Record<string, string> = {
   Music: 'M12 2.5a.75.75 0 0 0-.93-.73l-5 1.25A.75.75 0 0 0 5.5 3.75v5.6A2.5 2.5 0 1 0 7 11.5V6.34l4-1v2.26A2.5 2.5 0 1 0 12.5 10V2.5Z',
   Animate: 'M8 1.5l1.2 3.3L12.5 6 9.2 7.2 8 10.5 6.8 7.2 3.5 6l3.3-1.2L8 1.5Zm4.5 8l.55 1.45L14.5 11.5l-1.45.55L12.5 13.5l-.55-1.45L10.5 11.5l1.45-.55L12.5 9.5Z',
   Transcribe: 'M3 4.25A.75.75 0 0 1 3.75 3.5h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 3 4.25Zm0 3.5A.75.75 0 0 1 3.75 7h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 3 7.75Zm.75 2.75a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5h-5Z',
+  'Edit video': 'M2.5 12.4 9 5.9l1.6 1.6-6.5 6.5-1.6-1.6Zm9-9 .9 1 1 .35-1 .35-.35 1-.35-1-1-.35 1-.35.35-1ZM12 7l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4L10 9l1.4-.6L12 7Z',
 };
 
 export default function App() {
