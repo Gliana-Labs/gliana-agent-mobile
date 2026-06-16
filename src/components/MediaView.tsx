@@ -14,7 +14,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library/legacy';
+import { Asset as MediaAsset, requestPermissionsAsync } from 'expo-media-library';
 import { colors, radius, space } from '../theme';
 import { DownloadIcon, PauseIcon, PlayIcon } from './icons';
 import { FullscreenImage } from './FullscreenImage';
@@ -77,15 +77,15 @@ function ResultActions({
     setBusy('save');
     try {
       // writeOnly=true → the permission needed to ADD to the gallery.
-      const perm = await MediaLibrary.requestPermissionsAsync(true);
+      const perm = await requestPermissionsAsync(true);
       if (!perm.granted) {
         Alert.alert('Permission needed', 'Allow media access in Settings to save to your device.');
         return;
       }
       const uri = await download();
-      // createAssetAsync inserts into MediaStore and returns the asset (or throws
-      // a descriptive error); more reliable than saveToLibraryAsync here.
-      await MediaLibrary.createAssetAsync(uri);
+      // New class-based API (SDK 56): Asset.create inserts into the device's media
+      // store. Replaces the deprecated createAssetAsync/saveToLibraryAsync.
+      await MediaAsset.create(uri);
       Alert.alert('Saved', 'Saved to your device gallery.');
     } catch (e) {
       Alert.alert('Could not save', e instanceof Error ? e.message : 'Unknown error — try Share instead.');
