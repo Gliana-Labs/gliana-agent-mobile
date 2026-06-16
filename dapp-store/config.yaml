@@ -14,7 +14,7 @@ app:
   urls:
     license_url: https://glianalabs.com/terms
     copyright_url: https://glianalabs.com
-    privacy_policy_url: https://glianalabs.com/privacy # TODO: ensure this page exists
+    privacy_policy_url: https://glianalabs.com/privacy
     website: https://agent.glianalabs.com
   media:
     - purpose: icon
