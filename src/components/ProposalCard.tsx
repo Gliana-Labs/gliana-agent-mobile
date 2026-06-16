@@ -54,10 +54,16 @@ export function ProposalCard({
   const reqRef = useRef(0);
   useEffect(() => {
     const id = ++reqRef.current;
+    // Duration can be a number, a numeric string ("8"), a suffixed enum ("8s"),
+    // or a dropdown value — parseFloat reads the leading number from any of them.
+    // Plain `typeof === 'number'` dropped string/enum durations from the quote, so
+    // picking a duration never moved the price (the bug). Mirror the web's parse.
+    const durationNum = parseFloat(String(values.duration));
     const params = {
       text: typeof values.text === 'string' ? values.text : undefined,
-      duration: typeof values.duration === 'number' ? values.duration : undefined,
-      resolution: typeof values.resolution === 'string' ? values.resolution : undefined,
+      duration: Number.isFinite(durationNum) && durationNum > 0 ? durationNum : undefined,
+      resolution:
+        values.resolution !== undefined && values.resolution !== '' ? String(values.resolution) : undefined,
     };
     const t = setTimeout(() => {
       quote(model, params)

@@ -47,7 +47,7 @@ export function MediaView({ result }: { result: GenerationResult }) {
   return (
     <View style={{ gap: space(2.5) }}>
       {media}
-      <ResultActions url={url} contentType={contentType} canSaveToGallery={kindForSave !== 'file'} />
+      <ResultActions url={url} contentType={contentType} kind={kindForSave} />
     </View>
   );
 }
@@ -55,12 +55,16 @@ export function MediaView({ result }: { result: GenerationResult }) {
 function ResultActions({
   url,
   contentType,
-  canSaveToGallery,
+  kind,
 }: {
   url: string;
   contentType?: string;
-  canSaveToGallery: boolean;
+  kind: 'image' | 'video' | 'audio' | 'file';
 }) {
+  const canSaveToGallery = kind !== 'file';
+  // Android sorts media-store saves by type: image/video → Photos/Gallery,
+  // audio → Music (Files app → Music). Tell the user where it actually went.
+  const savedWhere = kind === 'audio' ? 'your device (Files → Music).' : 'your device gallery.';
   const [busy, setBusy] = useState<'save' | 'share' | null>(null);
 
   async function download(): Promise<string> {
@@ -85,8 +89,18 @@ function ResultActions({
       const uri = await download();
       // New class-based API (SDK 56): Asset.create inserts into the device's media
       // store. Replaces the deprecated createAssetAsync/saveToLibraryAsync.
-      await MediaAsset.create(uri);
-      Alert.alert('Saved', 'Saved to your device gallery.');
+      try {
+        await MediaAsset.create(uri);
+        Alert.alert('Saved', `Saved to ${savedWhere}`);
+      } catch (createErr) {
+        // Some Android versions reject audio into the media store — fall back to
+        // the share sheet (which offers Save to Files / Downloads).
+        if (kind === 'audio' && (await Sharing.isAvailableAsync())) {
+          await Sharing.shareAsync(uri, { mimeType: contentType || undefined, dialogTitle: 'Save audio' });
+        } else {
+          throw createErr;
+        }
+      }
     } catch (e) {
       Alert.alert('Could not save', e instanceof Error ? e.message : 'Unknown error — try Share instead.');
     } finally {
