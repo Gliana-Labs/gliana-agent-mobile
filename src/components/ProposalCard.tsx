@@ -16,12 +16,21 @@ import { ModelPicker } from './ModelPicker';
 import { Attachment, type AttachKind } from './Attachment';
 import type { GenerationResult, ProposalDraft } from '../types';
 
-/** Which file (if any) a proposal needs at approval — mirrors the web card. */
-function attachFor(category: string, input: Record<string, unknown>): { kind: AttachKind; key: string } | null {
-  const note = (typeof input.note === 'string' ? input.note : '').toLowerCase();
-  if (category === 'stt' || note.includes('audio')) return { kind: 'audio', key: 'audio' };
-  if (category === 'image-to-video' || note.includes('image')) return { kind: 'image', key: 'image' };
-  return null;
+/**
+ * The file input a proposal needs — derived from the schema's `fileRef` field
+ * (the gateway marks any URL/upload field fileRef). Keyed by the REAL field name
+ * (video_uri / image / audio / …) with the kind inferred from the name, so video
+ * editors (aleph-2) get a video attachment, not a hidden field. Falls back to the
+ * agent's category/note hint when the schema isn't loaded yet.
+ */
+function attachFromSchema(schema: ModelSchema | null): { kind: AttachKind; key: string } | null {
+  if (!schema) return null;
+  const entry = Object.entries(schema.props).find(([, p]) => p.fileRef);
+  if (!entry) return null;
+  const [key] = entry;
+  const k = key.toLowerCase();
+  const kind: AttachKind = /video/.test(k) ? 'video' : /audio|speech|sound/.test(k) ? 'audio' : 'image';
+  return { kind, key };
 }
 
 export function ProposalCard({
@@ -133,8 +142,8 @@ export function ProposalCard({
     return out;
   }, [model, values]);
 
-  // File this proposal needs (image for animate, audio for transcribe).
-  const attach = useMemo(() => attachFor(proposal.category, proposal.input), [proposal.category, proposal.input]);
+  // File this proposal needs — derived from the schema's fileRef field.
+  const attach = useMemo(() => attachFromSchema(schema), [schema]);
   const attachMissing = attach != null && (values[attach.key] === undefined || values[attach.key] === '');
 
   // Required fields with no value block pay (same as the web card) — avoids a
@@ -261,7 +270,9 @@ export function ProposalCard({
               <Text style={styles.payText}>Connect wallet to pay</Text>
             </>
           ) : attachMissing ? (
-            <Text style={styles.payText}>Attach {attach?.kind === 'audio' ? 'an audio file' : 'an image'}</Text>
+            <Text style={styles.payText}>
+              Attach {attach?.kind === 'audio' ? 'an audio file' : attach?.kind === 'video' ? 'a video' : 'an image'}
+            </Text>
           ) : missing.length > 0 ? (
             <Text style={styles.payText}>Fill {missing.join(', ')}</Text>
           ) : (

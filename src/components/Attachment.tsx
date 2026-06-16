@@ -11,7 +11,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { colors, radius, space } from '../theme';
 
-export type AttachKind = 'image' | 'audio';
+export type AttachKind = 'image' | 'audio' | 'video';
 
 // Base64 inflates ~4/3 and the gateway caps bodies ~1 MB.
 const MAX_BYTES = 700_000;
@@ -58,11 +58,15 @@ export function Attachment({
 
   async function pickFile() {
     setError('');
-    const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true });
+    const res = await DocumentPicker.getDocumentAsync({
+      type: kind === 'video' ? 'video/*' : 'audio/*',
+      copyToCacheDirectory: true,
+    });
     if (res.canceled || !res.assets?.[0]) return;
     const a = res.assets[0];
     if ((a.size ?? 0) > MAX_BYTES) {
-      setError('File must be under ~700 KB for now.');
+      // Big media (esp. video) can't go inline — tell the user to paste a URL.
+      setError(`Too big to upload inline (≤700 KB). Paste a ${kind} URL instead.`);
       return;
     }
     setReading(true);
@@ -77,13 +81,15 @@ export function Attachment({
   }
 
   const pick = kind === 'image' ? pickImage : pickFile;
-  const pickLabel =
-    reading
-      ? 'Reading…'
-      : hasFile
-        ? `${kind === 'image' ? 'Image' : 'File'} attached ✓ — pick another`
-        : kind === 'image'
-          ? 'Attach an image to animate (≤700 KB)'
+  const noun = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : 'File';
+  const pickLabel = reading
+    ? 'Reading…'
+    : hasFile
+      ? `${noun} attached ✓ — pick another`
+      : kind === 'image'
+        ? 'Attach an image (≤700 KB)'
+        : kind === 'video'
+          ? 'Pick a small video (≤700 KB) — or paste a URL below'
           : 'Attach the audio file to transcribe (≤700 KB)';
 
   return (
