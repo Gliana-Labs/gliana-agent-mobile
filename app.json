@@ -46,6 +46,12 @@
           "savePhotosPermission": "Allow Gliana Agent to save generated media to your device.",
           "isAccessMediaLocationEnabled": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Gliana Agent to attach an image for image-to-video models."
+        }
       ]
     ]
   }

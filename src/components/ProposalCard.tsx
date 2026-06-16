@@ -13,7 +13,16 @@ import { colors, radius, space } from '../theme';
 import { SchemaFields } from './SchemaFields';
 import { WalletIcon } from './icons';
 import { ModelPicker } from './ModelPicker';
+import { Attachment, type AttachKind } from './Attachment';
 import type { GenerationResult, ProposalDraft } from '../types';
+
+/** Which file (if any) a proposal needs at approval — mirrors the web card. */
+function attachFor(category: string, input: Record<string, unknown>): { kind: AttachKind; key: string } | null {
+  const note = (typeof input.note === 'string' ? input.note : '').toLowerCase();
+  if (category === 'stt' || note.includes('audio')) return { kind: 'audio', key: 'audio' };
+  if (category === 'image-to-video' || note.includes('image')) return { kind: 'image', key: 'image' };
+  return null;
+}
 
 export function ProposalCard({
   proposal,
@@ -124,18 +133,21 @@ export function ProposalCard({
     return out;
   }, [model, values]);
 
+  // File this proposal needs (image for animate, audio for transcribe).
+  const attach = useMemo(() => attachFor(proposal.category, proposal.input), [proposal.category, proposal.input]);
+  const attachMissing = attach != null && (values[attach.key] === undefined || values[attach.key] === '');
+
   // Required fields with no value block pay (same as the web card) — avoids a
-  // charge that would 400 server-side. File fields are excluded (no mobile
-  // attachment upload yet).
+  // charge that would 400 server-side. File fields are handled by the attach box.
   const missing = useMemo(
     () =>
       (schema?.required ?? []).filter((k) => {
         const p = schema?.props[k];
-        if (!p || p.fileRef) return false;
+        if (!p || p.fileRef || k === attach?.key) return false;
         const v = values[k];
         return v === undefined || v === '';
       }),
-    [schema, values],
+    [schema, values, attach],
   );
 
   async function pay() {
@@ -189,6 +201,17 @@ export function ProposalCard({
         </View>
       )}
 
+      {attach && (
+        <View style={{ marginTop: space(4) }}>
+          <Attachment
+            kind={attach.kind}
+            value={values[attach.key]}
+            onChange={(v) => setField(attach.key, v)}
+            disabled={status === 'paying' || status === 'done'}
+          />
+        </View>
+      )}
+
       {q.units > 1 && (
         <Text style={styles.breakdown}>
           {q.units} {q.unit}
@@ -212,11 +235,17 @@ export function ProposalCard({
       ) : (
         <Pressable
           onPress={pay}
-          disabled={status === 'paying' || connecting || pricing || (account != null && missing.length > 0)}
+          disabled={
+            status === 'paying' || connecting || pricing || (account != null && (missing.length > 0 || attachMissing))
+          }
           style={[
             styles.payBtn,
             styles.payActive,
-            (status === 'paying' || connecting || pricing || (account != null && missing.length > 0)) && styles.payBusy,
+            (status === 'paying' ||
+              connecting ||
+              pricing ||
+              (account != null && (missing.length > 0 || attachMissing))) &&
+              styles.payBusy,
           ]}
         >
           {status === 'paying' || connecting ? (
@@ -231,6 +260,8 @@ export function ProposalCard({
               <WalletIcon size={16} color="#0a0a0d" />
               <Text style={styles.payText}>Connect wallet to pay</Text>
             </>
+          ) : attachMissing ? (
+            <Text style={styles.payText}>Attach {attach?.kind === 'audio' ? 'an audio file' : 'an image'}</Text>
           ) : missing.length > 0 ? (
             <Text style={styles.payText}>Fill {missing.join(', ')}</Text>
           ) : (
