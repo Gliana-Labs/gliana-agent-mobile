@@ -29,6 +29,9 @@ export function SchemaFields({
       {keys.map((key) => {
         const p = schema.props[key];
         if (p.fileRef) return null;
+        // billing-only fields (e.g. video-editing duration) are measured from the
+        // source video, not typed by the user — hide them.
+        if (/billing only|not sent/i.test(p.description ?? '')) return null;
         return (
           <Field
             key={key}

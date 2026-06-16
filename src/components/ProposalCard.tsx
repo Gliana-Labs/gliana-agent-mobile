@@ -6,6 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useVideoPlayer } from 'expo-video';
 import { fetchSchema, quote, usd, type ModelSchema, type Proposal, type Quote } from '../lib/api';
 import { payAndRun } from '../lib/pay';
 import { useWallet } from '../lib/mwa';
@@ -144,6 +145,17 @@ export function ProposalCard({
 
   // File this proposal needs — derived from the schema's fileRef field.
   const attach = useMemo(() => attachFromSchema(schema), [schema]);
+
+  // Billing-only duration (video editing) is measured from the source video, not
+  // typed — find that field + a usable video URL to probe.
+  const billingDurKey = useMemo(
+    () => (schema ? Object.entries(schema.props).find(([, p]) => /billing only|not sent/i.test(p.description ?? ''))?.[0] : undefined),
+    [schema],
+  );
+  const probeUri =
+    attach?.kind === 'video' && typeof values[attach.key] === 'string' && /^https?:/.test(values[attach.key] as string)
+      ? (values[attach.key] as string)
+      : null;
   const attachMissing = attach != null && (values[attach.key] === undefined || values[attach.key] === '');
 
   // Required fields with no value block pay (same as the web card) — avoids a
@@ -219,6 +231,15 @@ export function ProposalCard({
             disabled={status === 'paying' || status === 'done'}
           />
         </View>
+      )}
+
+      {billingDurKey && probeUri && (
+        <VideoDurationProbe
+          key={probeUri}
+          uri={probeUri}
+          max={schema?.props[billingDurKey]?.max ?? 60}
+          onDuration={(s) => setField(billingDurKey, s)}
+        />
       )}
 
       {q.units > 1 && (
@@ -318,6 +339,28 @@ function humanError(e: unknown): string {
     return e.message;
   }
   return 'Something went wrong.';
+}
+
+/**
+ * Headless: loads a video just to read its duration, then reports it once (for
+ * billing-only duration on video-editing models). Renders nothing.
+ */
+function VideoDurationProbe({ uri, max, onDuration }: { uri: string; max: number; onDuration: (s: number) => void }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.muted = true;
+  });
+  const done = useRef(false);
+  useEffect(() => {
+    const sub = player.addListener('statusChange', () => {
+      if (!done.current && player.duration && player.duration > 0) {
+        done.current = true;
+        onDuration(Math.max(1, Math.min(Math.ceil(player.duration), max)));
+      }
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player]);
+  return null;
 }
 
 const styles = StyleSheet.create({
