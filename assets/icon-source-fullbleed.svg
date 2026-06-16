@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512">
+  <!-- Full-bleed app-icon source: square background (no rounded corners) so icon
+       generators (and Android/iOS masking) don't reveal transparent/white corners.
+       The OS applies its own rounding/masking. Brand dark + solid amber AG mark. -->
+  <rect width="512" height="512" fill="#0b0b0e"/>
+  <g transform="translate(106,136) scale(1.23)" fill="#F59E0B">
+    <path d="M0,195 L101.4,0 L134.4,0 L33,195 Z"/>
+    <path d="M144,4 L187,87 L150,87 L143,74 L99.5,161 L126.5,161 L110,195 L52,195 Z"/>
+    <path d="M139,112 L201,112 L244,195 L127,195 L143,162 L189,162 L179,141 L155,141 Z"/>
+  </g>
+</svg>
