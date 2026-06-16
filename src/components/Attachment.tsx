@@ -4,7 +4,7 @@
  * paste a URL. The value handed up is either a public URL or raw base64 (no data
  * prefix) — both accepted by the gateway for the model's file field.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -28,15 +28,21 @@ export function Attachment({
   value,
   onChange,
   disabled,
+  onBusy,
 }: {
   kind: AttachKind;
   value: unknown;
   onChange: (v: string | undefined) => void;
   disabled?: boolean;
+  onBusy?: (busy: boolean) => void;
 }) {
   const [reading, setReading] = useState(false);
   const [error, setError] = useState('');
   const hasFile = typeof value === 'string' && value.length > 0 && !isUrl(value);
+  // Surface upload/read progress so the parent can disable pay while it runs.
+  useEffect(() => {
+    onBusy?.(reading);
+  }, [reading, onBusy]);
 
   async function pickImage() {
     setError('');

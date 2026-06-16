@@ -55,6 +55,7 @@ export function ProposalCard({
   }));
   const [q, setQ] = useState<Quote>(proposal.quote);
   const [pricing, setPricing] = useState(false);
+  const [attachBusy, setAttachBusy] = useState(false); // uploading/reading an attachment
   const [status, setStatus] = useState<'idle' | 'paying' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -229,6 +230,7 @@ export function ProposalCard({
             value={values[attach.key]}
             onChange={(v) => setField(attach.key, v)}
             disabled={status === 'paying' || status === 'done'}
+            onBusy={setAttachBusy}
           />
         </View>
       )}
@@ -266,7 +268,11 @@ export function ProposalCard({
         <Pressable
           onPress={pay}
           disabled={
-            status === 'paying' || connecting || pricing || (account != null && (missing.length > 0 || attachMissing))
+            status === 'paying' ||
+            connecting ||
+            pricing ||
+            attachBusy ||
+            (account != null && (missing.length > 0 || attachMissing))
           }
           style={[
             styles.payBtn,
@@ -274,6 +280,7 @@ export function ProposalCard({
             (status === 'paying' ||
               connecting ||
               pricing ||
+              attachBusy ||
               (account != null && (missing.length > 0 || attachMissing))) &&
               styles.payBusy,
           ]}
@@ -282,6 +289,11 @@ export function ProposalCard({
             <>
               <ActivityIndicator color="#0a0a0d" />
               <Text style={styles.payText}>{connecting ? 'Connecting wallet…' : 'Paying & generating…'}</Text>
+            </>
+          ) : attachBusy ? (
+            <>
+              <ActivityIndicator color="#0a0a0d" />
+              <Text style={styles.payText}>Uploading…</Text>
             </>
           ) : pricing ? (
             <Text style={styles.payText}>Updating price…</Text>
