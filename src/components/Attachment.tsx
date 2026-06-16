@@ -9,12 +9,15 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { API } from '../lib/api';
 import { colors, radius, space } from '../theme';
 
 export type AttachKind = 'image' | 'audio' | 'video';
 
-// Base64 inflates ~4/3 and the gateway caps bodies ~1 MB.
+// Base64 inflates ~4/3 and the gateway caps inline bodies ~1 MB.
 const MAX_BYTES = 700_000;
+// Video can't go inline — it's streamed to R2 via POST /v1/media (40 MB cap).
+const MAX_VIDEO_BYTES = 40_000_000;
 
 function isUrl(v: unknown): v is string {
   return typeof v === 'string' && /^https?:\/\//.test(v);
@@ -80,21 +83,50 @@ export function Attachment({
     }
   }
 
-  const pick = kind === 'image' ? pickImage : pickFile;
+  // Video: pick a file and STREAM it to R2 (POST /v1/media) — too big for inline
+  // base64. Returns a hosted URL we set as the value.
+  async function uploadVideo() {
+    setError('');
+    const res = await DocumentPicker.getDocumentAsync({ type: 'video/*', copyToCacheDirectory: true });
+    if (res.canceled || !res.assets?.[0]) return;
+    const a = res.assets[0];
+    if ((a.size ?? 0) > MAX_VIDEO_BYTES) {
+      setError('Video must be under 40 MB — or paste a URL.');
+      return;
+    }
+    setReading(true);
+    try {
+      const up = await FileSystem.uploadAsync(`${API}/v1/media`, a.uri, {
+        httpMethod: 'POST',
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: { 'content-type': a.mimeType || 'video/mp4' },
+      });
+      const url = up.status >= 200 && up.status < 300 ? (JSON.parse(up.body).url as string) : null;
+      if (!url) throw new Error('upload failed');
+      onChange(url);
+    } catch {
+      setError('Upload failed — try a smaller file or paste a URL.');
+    } finally {
+      setReading(false);
+    }
+  }
+
+  const pick = kind === 'image' ? pickImage : kind === 'video' ? uploadVideo : pickFile;
   const noun = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : 'File';
   const pickLabel = reading
-    ? 'Reading…'
-    : hasFile
+    ? kind === 'video'
+      ? 'Uploading…'
+      : 'Reading…'
+    : hasFile || (kind === 'video' && isUrl(value))
       ? `${noun} attached ✓ — pick another`
       : kind === 'image'
         ? 'Attach an image (≤700 KB)'
         : kind === 'video'
-          ? 'Pick a small video (≤700 KB) — or paste a URL below'
+          ? 'Upload a video (≤40 MB) — or paste a URL below'
           : 'Attach the audio file to transcribe (≤700 KB)';
 
-  // Video can't go inline (the gateway body cap is ~1 MB; base64 video blows past
-  // it) — so for video the only practical input is a URL. Hide the file picker.
-  const urlOnly = kind === 'video';
+  // Video now supports upload (streamed to R2) AND URL — show both.
+  const urlOnly = false;
 
   return (
     <View style={{ gap: space(2) }}>
