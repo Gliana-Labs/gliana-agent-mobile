@@ -68,11 +68,13 @@ export function ProposalCard({
   }, [model, values.text, values.duration, values.resolution]);
 
   function setField(key: string, value: unknown) {
-    setValues((v) => {
-      const next = { ...v, [key]: value };
-      onDraft({ fields: next });
-      return next;
-    });
+    // Compute next from current values, then update both states OUTSIDE the
+    // setValues updater. Calling onDraft (a parent setState) inside the updater
+    // runs it during ProposalCard's render → "Cannot update a component (Main)
+    // while rendering ProposalCard".
+    const next = { ...values, [key]: value };
+    setValues(next);
+    onDraft({ fields: next });
   }
 
   // Switch model (from the picker): re-seed inputs (the agent's input only fits
