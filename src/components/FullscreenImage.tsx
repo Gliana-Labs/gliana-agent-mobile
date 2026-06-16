@@ -22,7 +22,7 @@ export function FullscreenImage({ uri, visible, onClose }: { uri: string; visibl
 
   const pinch = Gesture.Pinch()
     .onUpdate((e) => {
-      scale.value = Math.max(1, savedScale.value * e.scale);
+      scale.value = Math.min(Math.max(savedScale.value * e.scale, 1), 6);
     })
     .onEnd(() => {
       savedScale.value = scale.value;
@@ -36,7 +36,10 @@ export function FullscreenImage({ uri, visible, onClose }: { uri: string; visibl
       }
     });
 
+  // maxPointers(1): pan only with ONE finger, so it never fights the two-finger
+  // pinch (the bug that made pinch feel like it wasn't working).
   const pan = Gesture.Pan()
+    .maxPointers(1)
     .onUpdate((e) => {
       tx.value = savedTx.value + e.translationX;
       ty.value = savedTy.value + e.translationY;
@@ -49,15 +52,20 @@ export function FullscreenImage({ uri, visible, onClose }: { uri: string; visibl
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
-      scale.value = withTiming(1);
-      savedScale.value = 1;
-      tx.value = withTiming(0);
-      ty.value = withTiming(0);
-      savedTx.value = 0;
-      savedTy.value = 0;
+      if (scale.value > 1) {
+        scale.value = withTiming(1);
+        savedScale.value = 1;
+        tx.value = withTiming(0);
+        ty.value = withTiming(0);
+        savedTx.value = 0;
+        savedTy.value = 0;
+      } else {
+        scale.value = withTiming(2.5);
+        savedScale.value = 2.5;
+      }
     });
 
-  const gesture = Gesture.Exclusive(doubleTap, Gesture.Simultaneous(pinch, pan));
+  const gesture = Gesture.Simultaneous(pinch, pan, doubleTap);
 
   const imageStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],

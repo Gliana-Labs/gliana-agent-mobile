@@ -17,7 +17,7 @@
       "package": "com.glianalabs.agent",
       "userInterfaceStyle": "dark",
       "adaptiveIcon": {
-        "backgroundColor": "#0a0a0d",
+        "backgroundColor": "#0b0b0e",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false
@@ -36,7 +36,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0a0a0d"
+          "backgroundColor": "#0b0b0e"
         }
       ],
       "expo-sharing"
