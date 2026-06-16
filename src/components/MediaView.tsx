@@ -14,7 +14,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { colors, radius, space } from '../theme';
 import { DownloadIcon, PauseIcon, PlayIcon } from './icons';
 import { FullscreenImage } from './FullscreenImage';
