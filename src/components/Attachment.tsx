@@ -92,24 +92,34 @@ export function Attachment({
           ? 'Pick a small video (≤700 KB) — or paste a URL below'
           : 'Attach the audio file to transcribe (≤700 KB)';
 
+  // Video can't go inline (the gateway body cap is ~1 MB; base64 video blows past
+  // it) — so for video the only practical input is a URL. Hide the file picker.
+  const urlOnly = kind === 'video';
+
   return (
     <View style={{ gap: space(2) }}>
-      <Pressable style={styles.drop} onPress={pick} disabled={disabled || reading}>
-        {reading ? <ActivityIndicator size="small" color={colors.flameSoft} /> : null}
-        <Text style={styles.dropText}>{pickLabel}</Text>
-      </Pressable>
+      {!urlOnly && (
+        <>
+          <Pressable style={styles.drop} onPress={pick} disabled={disabled || reading}>
+            {reading ? <ActivityIndicator size="small" color={colors.flameSoft} /> : null}
+            <Text style={styles.dropText}>{pickLabel}</Text>
+          </Pressable>
 
-      <View style={styles.orRow}>
-        <View style={styles.hr} />
-        <Text style={styles.orText}>or paste a URL</Text>
-        <View style={styles.hr} />
-      </View>
+          <View style={styles.orRow}>
+            <View style={styles.hr} />
+            <Text style={styles.orText}>or paste a URL</Text>
+            <View style={styles.hr} />
+          </View>
+        </>
+      )}
+
+      {urlOnly && <Text style={styles.dropText}>Paste a link to your source video (MP4 URL):</Text>}
 
       <TextInput
         style={styles.url}
         value={isUrl(value) ? value : ''}
         onChangeText={(t) => onChange(t.trim() || undefined)}
-        placeholder="https://…"
+        placeholder={urlOnly ? 'https://…/video.mp4' : 'https://…'}
         placeholderTextColor={colors.textGhost}
         autoCapitalize="none"
         autoCorrect={false}
