@@ -8,6 +8,7 @@
     "@solana/kit": "^6.9.0",
     "@solana/mpp": "^0.6.0",
     "@solana/webcrypto-ed25519-polyfill": "^6.9.0",
+    "babel-preset-expo": "~56.0.0",
     "buffer": "^6.0.3",
     "expo": "~56.0.12",
     "expo-audio": "~56.0.12",
