@@ -104,13 +104,17 @@ function Field({
   }
 
   const isNumber = spec.type === 'number' || spec.type === 'integer';
+  // Duration has no schema max on some models, but the gateway clamps seconds to
+  // 60 — mirror that so a typed value can't quote an uncharged number (parity
+  // with the web card).
+  const maxVal = spec.max ?? (name === 'duration' ? 60 : undefined);
   const range =
-    isNumber && (spec.min !== undefined || spec.max !== undefined)
-      ? `${spec.min ?? '–'} to ${spec.max ?? '–'}`
+    isNumber && (spec.min !== undefined || maxVal !== undefined)
+      ? `${spec.min ?? '–'} to ${maxVal ?? '–'}`
       : null;
 
-  // Clamp a number field to the schema's [min, max] so a forged value (e.g.
-  // duration 9999 on a model that maxes at 12) can't be entered or quoted.
+  // Clamp a number field to [min, max] so a forged value (e.g. duration 9999 on a
+  // model that maxes at 12) can't be entered or quoted.
   function commitNumber() {
     if (!isNumber || value === undefined || value === null || value === '') return;
     let n = Number(value);
@@ -119,7 +123,7 @@ function Field({
       return;
     }
     if (spec.min !== undefined && n < spec.min) n = spec.min;
-    if (spec.max !== undefined && n > spec.max) n = spec.max;
+    if (maxVal !== undefined && n > maxVal) n = maxVal;
     if (spec.type === 'integer') n = Math.round(n);
     if (n !== Number(value)) onChange(n);
   }
