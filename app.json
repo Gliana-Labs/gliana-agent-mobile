@@ -39,7 +39,14 @@
           "backgroundColor": "#0b0b0e"
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Allow Gliana Agent to save generated media to your device.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ]
   }
 }
