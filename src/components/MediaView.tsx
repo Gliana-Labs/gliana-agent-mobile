@@ -71,20 +71,24 @@ function ResultActions({
   }
 
   // Save to the device gallery (Photos) — the real "save to file" on mobile for
-  // image/video/audio. Requests the media permission on first use.
+  // image/video/audio. Requests WRITE media permission, downloads the file, then
+  // creates a gallery asset. Surfaces the real error so failures aren't silent.
   async function onSave() {
     setBusy('save');
     try {
-      const perm = await MediaLibrary.requestPermissionsAsync();
+      // writeOnly=true → the permission needed to ADD to the gallery.
+      const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) {
-        Alert.alert('Permission needed', 'Allow media access to save to your device.');
+        Alert.alert('Permission needed', 'Allow media access in Settings to save to your device.');
         return;
       }
       const uri = await download();
-      await MediaLibrary.saveToLibraryAsync(uri);
+      // createAssetAsync inserts into MediaStore and returns the asset (or throws
+      // a descriptive error); more reliable than saveToLibraryAsync here.
+      await MediaLibrary.createAssetAsync(uri);
       Alert.alert('Saved', 'Saved to your device gallery.');
-    } catch {
-      Alert.alert('Could not save', 'Try Share instead, or open the file.');
+    } catch (e) {
+      Alert.alert('Could not save', e instanceof Error ? e.message : 'Unknown error — try Share instead.');
     } finally {
       setBusy(null);
     }
