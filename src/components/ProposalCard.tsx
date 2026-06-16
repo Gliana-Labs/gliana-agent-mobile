@@ -35,6 +35,7 @@ export function ProposalCard({
     ...(draft?.fields ?? {}),
   }));
   const [q, setQ] = useState<Quote>(proposal.quote);
+  const [pricing, setPricing] = useState(false);
   const [status, setStatus] = useState<'idle' | 'paying' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +43,21 @@ export function ProposalCard({
     let alive = true;
     setSchema(null);
     fetchSchema(model)
-      .then((s) => alive && setSchema(s))
+      .then((s) => {
+        if (!alive) return;
+        setSchema(s);
+        // Seed the schema's defaults for any field the user hasn't set. Without
+        // this, a tiered field like `resolution` SHOWS its default (e.g. 720p)
+        // but isn't in `values`, so the quote omits it and the gateway prices the
+        // HIGHEST tier — the price was wrong until you tapped the default again.
+        setValues((prev) => {
+          const next = { ...prev };
+          for (const [k, p] of Object.entries(s.props)) {
+            if (next[k] === undefined && p.default !== undefined) next[k] = p.default;
+          }
+          return next;
+        });
+      })
       .catch(() => {});
     return () => {
       alive = false;
@@ -65,10 +80,16 @@ export function ProposalCard({
       resolution:
         values.resolution !== undefined && values.resolution !== '' ? String(values.resolution) : undefined,
     };
+    setPricing(true);
     const t = setTimeout(() => {
       quote(model, params)
-        .then((next) => id === reqRef.current && setQ(next))
-        .catch(() => {});
+        .then((next) => {
+          if (id === reqRef.current) {
+            setQ(next);
+            setPricing(false);
+          }
+        })
+        .catch(() => id === reqRef.current && setPricing(false));
     }, 250);
     return () => clearTimeout(t);
   }, [model, values.text, values.duration, values.resolution]);
@@ -102,6 +123,20 @@ export function ProposalCard({
     }
     return out;
   }, [model, values]);
+
+  // Required fields with no value block pay (same as the web card) — avoids a
+  // charge that would 400 server-side. File fields are excluded (no mobile
+  // attachment upload yet).
+  const missing = useMemo(
+    () =>
+      (schema?.required ?? []).filter((k) => {
+        const p = schema?.props[k];
+        if (!p || p.fileRef) return false;
+        const v = values[k];
+        return v === undefined || v === '';
+      }),
+    [schema, values],
+  );
 
   async function pay() {
     if (!signer) {
@@ -137,8 +172,10 @@ export function ProposalCard({
           <Text style={styles.changeHint}>tap to change</Text>
         </Pressable>
         <View style={styles.priceBox}>
-          <Text style={styles.price}>{usd(q.costMicroUsd)}</Text>
-          <Text style={styles.priceUnit}>{q.units > 1 ? `${q.units} × ${q.unit}` : q.unit}</Text>
+          <Text style={[styles.price, pricing && styles.priceStale]}>{usd(q.costMicroUsd)}</Text>
+          <Text style={styles.priceUnit}>
+            {pricing ? 'updating…' : q.units > 1 ? `${q.units} × ${q.unit}` : q.unit}
+          </Text>
         </View>
       </View>
 
@@ -150,6 +187,13 @@ export function ProposalCard({
         <View style={{ marginTop: space(4) }}>
           <ActivityIndicator color={colors.flameSoft} />
         </View>
+      )}
+
+      {q.units > 1 && (
+        <Text style={styles.breakdown}>
+          {q.units} {q.unit}
+          {q.units === 1 ? '' : 's'} × {usd(q.unitPriceMicroUsd)}
+        </Text>
       )}
 
       <Pressable
@@ -168,19 +212,27 @@ export function ProposalCard({
       ) : (
         <Pressable
           onPress={pay}
-          disabled={status === 'paying' || connecting}
-          style={[styles.payBtn, styles.payActive, (status === 'paying' || connecting) && styles.payBusy]}
+          disabled={status === 'paying' || connecting || pricing || (account != null && missing.length > 0)}
+          style={[
+            styles.payBtn,
+            styles.payActive,
+            (status === 'paying' || connecting || pricing || (account != null && missing.length > 0)) && styles.payBusy,
+          ]}
         >
           {status === 'paying' || connecting ? (
             <>
               <ActivityIndicator color="#0a0a0d" />
               <Text style={styles.payText}>{connecting ? 'Connecting wallet…' : 'Paying & generating…'}</Text>
             </>
+          ) : pricing ? (
+            <Text style={styles.payText}>Updating price…</Text>
           ) : !account ? (
             <>
               <WalletIcon size={16} color="#0a0a0d" />
               <Text style={styles.payText}>Connect wallet to pay</Text>
             </>
+          ) : missing.length > 0 ? (
+            <Text style={styles.payText}>Fill {missing.join(', ')}</Text>
           ) : (
             <Text style={styles.payText}>Pay {usd(q.costMicroUsd)} & generate</Text>
           )}
@@ -242,6 +294,8 @@ const styles = StyleSheet.create({
   changeHint: { color: colors.textGhost, fontSize: 10, marginTop: 2 },
   priceBox: { alignItems: 'flex-end' },
   price: { color: colors.flameSoft, fontSize: 18, fontWeight: '700', fontFamily: 'monospace' },
+  priceStale: { opacity: 0.4 },
+  breakdown: { color: colors.textFaint, fontSize: 12, marginTop: space(2) },
   priceUnit: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
   detailsLink: { marginTop: space(3) },
   detailsText: { color: colors.textFaint, fontSize: 12 },
