@@ -1,107 +1,79 @@
 /**
- * Fullscreen image viewer with pinch-to-zoom + pan + double-tap reset. Uses
- * react-native-gesture-handler with RN's built-in Animated (no reanimated, so
- * no babel worklet plugin). Tap the dimmed background or ✕ to close.
+ * Fullscreen image viewer with pinch-to-zoom + pan + double-tap reset, built on
+ * react-native-reanimated + the modern gesture-handler Gesture API. This is the
+ * Fabric-native way — the legacy Animated transform path throws an invariant on
+ * the new architecture. Tap the dimmed background or ✕ to close.
  */
-import { useRef } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import {
-  GestureHandlerRootView,
-  PanGestureHandler,
-  PinchGestureHandler,
-  State,
-  TapGestureHandler,
-} from 'react-native-gesture-handler';
+import { Modal, Pressable, StyleSheet, Text, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { colors, space } from '../theme';
 
 export function FullscreenImage({ uri, visible, onClose }: { uri: string; visible: boolean; onClose: () => void }) {
   const { width, height } = useWindowDimensions();
 
-  const baseScale = useRef(new Animated.Value(1)).current;
-  const pinchScale = useRef(new Animated.Value(1)).current;
-  const scale = Animated.multiply(baseScale, pinchScale);
-  const lastScale = useRef(1);
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const savedTx = useSharedValue(0);
+  const savedTy = useSharedValue(0);
 
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-  const lastX = useRef(0);
-  const lastY = useRef(0);
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.max(1, savedScale.value * e.scale);
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      if (scale.value <= 1) {
+        scale.value = withTiming(1);
+        savedScale.value = 1;
+        tx.value = withTiming(0);
+        ty.value = withTiming(0);
+        savedTx.value = 0;
+        savedTy.value = 0;
+      }
+    });
 
-  const pinchRef = useRef(null);
-  const panRef = useRef(null);
-  const doubleTapRef = useRef(null);
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      tx.value = savedTx.value + e.translationX;
+      ty.value = savedTy.value + e.translationY;
+    })
+    .onEnd(() => {
+      savedTx.value = tx.value;
+      savedTy.value = ty.value;
+    });
 
-  function reset() {
-    lastScale.current = 1;
-    lastX.current = 0;
-    lastY.current = 0;
-    translateX.setOffset(0);
-    translateY.setOffset(0);
-    Animated.parallel([
-      Animated.spring(baseScale, { toValue: 1, useNativeDriver: true }),
-      Animated.spring(pinchScale, { toValue: 1, useNativeDriver: true }),
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }),
-      Animated.spring(translateY, { toValue: 0, useNativeDriver: true }),
-    ]).start();
-  }
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      scale.value = withTiming(1);
+      savedScale.value = 1;
+      tx.value = withTiming(0);
+      ty.value = withTiming(0);
+      savedTx.value = 0;
+      savedTy.value = 0;
+    });
 
-  const onPinch = Animated.event([{ nativeEvent: { scale: pinchScale } }], { useNativeDriver: true });
-  function onPinchState(e: { nativeEvent: { oldState: number; scale: number } }) {
-    if (e.nativeEvent.oldState === State.ACTIVE) {
-      lastScale.current = Math.max(1, Math.min(lastScale.current * e.nativeEvent.scale, 5));
-      baseScale.setValue(lastScale.current);
-      pinchScale.setValue(1);
-      if (lastScale.current === 1) reset();
-    }
-  }
+  const gesture = Gesture.Exclusive(doubleTap, Gesture.Simultaneous(pinch, pan));
 
-  const onPan = Animated.event([{ nativeEvent: { translationX: translateX, translationY: translateY } }], {
-    useNativeDriver: true,
-  });
-  function onPanState(e: { nativeEvent: { oldState: number; translationX: number; translationY: number } }) {
-    if (e.nativeEvent.oldState === State.ACTIVE) {
-      lastX.current += e.nativeEvent.translationX;
-      lastY.current += e.nativeEvent.translationY;
-      translateX.setOffset(lastX.current);
-      translateX.setValue(0);
-      translateY.setOffset(lastY.current);
-      translateY.setValue(0);
-    }
-  }
+  const imageStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
+  }));
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <GestureHandlerRootView style={styles.root}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <PanGestureHandler
-          ref={panRef}
-          minPointers={1}
-          avgTouches
-          simultaneousHandlers={pinchRef}
-          onGestureEvent={onPan}
-          onHandlerStateChange={onPanState}
-        >
+        <GestureDetector gesture={gesture}>
           <Animated.View style={styles.center}>
-            <PinchGestureHandler
-              ref={pinchRef}
-              simultaneousHandlers={panRef}
-              onGestureEvent={onPinch}
-              onHandlerStateChange={onPinchState}
-            >
-              <Animated.View>
-                <TapGestureHandler ref={doubleTapRef} numberOfTaps={2} onActivated={reset}>
-                  {/* Transform lives on the Animated.View — expo-image's <Image> is
-                      not an animated component, so Animated.Values on its own
-                      transform throw "translateX must be a number or percentage". */}
-                  <Animated.View style={{ transform: [{ translateX }, { translateY }, { scale }] }}>
-                    <Image source={{ uri }} style={{ width, height: height * 0.8 }} contentFit="contain" />
-                  </Animated.View>
-                </TapGestureHandler>
-              </Animated.View>
-            </PinchGestureHandler>
+            <Animated.View style={imageStyle}>
+              <Image source={{ uri }} style={{ width, height: height * 0.82 }} contentFit="contain" />
+            </Animated.View>
           </Animated.View>
-        </PanGestureHandler>
+        </GestureDetector>
 
         <Pressable style={styles.close} onPress={onClose} hitSlop={12}>
           <Text style={styles.closeText}>✕</Text>
