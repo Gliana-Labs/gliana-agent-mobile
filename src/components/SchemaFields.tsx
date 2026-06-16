@@ -104,16 +104,43 @@ function Field({
   }
 
   const isNumber = spec.type === 'number' || spec.type === 'integer';
+  const range =
+    isNumber && (spec.min !== undefined || spec.max !== undefined)
+      ? `${spec.min ?? '–'} to ${spec.max ?? '–'}`
+      : null;
+
+  // Clamp a number field to the schema's [min, max] so a forged value (e.g.
+  // duration 9999 on a model that maxes at 12) can't be entered or quoted.
+  function commitNumber() {
+    if (!isNumber || value === undefined || value === null || value === '') return;
+    let n = Number(value);
+    if (!Number.isFinite(n)) {
+      onChange(undefined);
+      return;
+    }
+    if (spec.min !== undefined && n < spec.min) n = spec.min;
+    if (spec.max !== undefined && n > spec.max) n = spec.max;
+    if (spec.type === 'integer') n = Math.round(n);
+    if (n !== Number(value)) onChange(n);
+  }
+
   return (
     <View>
-      {label}
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>{name}</Text>
+        {required && <Text style={styles.req}>required</Text>}
+        {range && <Text style={styles.range}>{range}</Text>}
+      </View>
       <TextInput
         style={[styles.input, name === 'prompt' || name === 'text' ? styles.inputMultiline : null]}
         value={value === undefined || value === null ? '' : String(value)}
         onChangeText={(t) => onChange(isNumber ? (t === '' ? undefined : Number(t)) : t)}
-        placeholder={spec.description ?? (isNumber ? '0' : `Enter ${name}`)}
+        onBlur={commitNumber}
+        onEndEditing={commitNumber}
+        placeholder={spec.description ?? (isNumber ? (range ?? '0') : `Enter ${name}`)}
         placeholderTextColor={colors.textGhost}
         keyboardType={isNumber ? 'numeric' : 'default'}
+        maxLength={!isNumber && typeof spec.max === 'number' ? spec.max : undefined}
         multiline={name === 'prompt' || name === 'text'}
       />
     </View>
@@ -134,6 +161,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
+  range: { color: colors.textGhost, fontSize: 10, fontFamily: 'monospace' },
   input: {
     backgroundColor: colors.surface,
     borderWidth: 1,
