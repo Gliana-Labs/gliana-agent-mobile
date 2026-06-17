@@ -138,8 +138,16 @@ function AudioCard({ uri }: { uri: string }) {
   const status = useAudioPlayerStatus(player);
   const playing = status.playing;
 
+  // Some sources report looping; force it off so a clip plays once.
   useEffect(() => {
-    if (status.didJustFinish) player.seekTo(0); // reset to start; status.playing flips false
+    player.loop = false;
+  }, [player]);
+
+  useEffect(() => {
+    if (status.didJustFinish) {
+      player.pause(); // stop (seekTo alone keeps it playing → loops)
+      player.seekTo(0);
+    }
   }, [status.didJustFinish, player]);
 
   return (
