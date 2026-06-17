@@ -43,11 +43,7 @@ export function Sidebar({
           <Text style={styles.newText}>New chat</Text>
         </Pressable>
 
-        <Pressable style={styles.linkBtn} onPress={onShowcase}>
-          <Text style={styles.linkText}>✦  Showcase</Text>
-        </Pressable>
-
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: insets.bottom + space(4) }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: space(4) }}>
           {conversations.length === 0 ? (
             <Text style={styles.empty}>No conversations yet.</Text>
           ) : (
@@ -68,6 +64,12 @@ export function Sidebar({
             })
           )}
         </ScrollView>
+
+        <View style={[styles.footer, { paddingBottom: insets.bottom + space(3) }]}>
+          <Pressable style={styles.footerLink} onPress={onShowcase}>
+            <Text style={styles.footerText}>✦  Showcase</Text>
+          </Pressable>
+        </View>
       </View>
     </Modal>
   );
@@ -103,8 +105,9 @@ const styles = StyleSheet.create({
     marginBottom: space(4),
   },
   newText: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  linkBtn: { paddingVertical: space(2.5), paddingHorizontal: space(3), marginTop: -space(2), marginBottom: space(3) },
-  linkText: { color: colors.textDim, fontSize: 14 },
+  footer: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space(2) },
+  footerLink: { paddingVertical: space(3), paddingHorizontal: space(3) },
+  footerText: { color: colors.textDim, fontSize: 14 },
   empty: { color: colors.textGhost, fontSize: 13, paddingHorizontal: space(2), paddingTop: space(2) },
   row: {
     flexDirection: 'row',
