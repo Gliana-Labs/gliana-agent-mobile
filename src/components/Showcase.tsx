@@ -5,11 +5,11 @@
  * tap-to-play; any media that fails to load hides its own card. "Make this"
  * closes the gallery and prefills the composer with that model.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useAudioPlayer } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import showcase from '../lib/showcase.json';
 import { colors, radius, space } from '../theme';
@@ -130,23 +130,27 @@ function VideoPlay({ uri, onError }: { uri: string; onError: () => void }) {
   return <VideoView player={player} style={styles.fill} contentFit="cover" nativeControls={false} />;
 }
 
-// Voice/music have no thumbnail — a speaker tile that plays/pauses on tap.
+// Voice/music have no thumbnail — a speaker tile that plays/pauses on tap. The
+// label is driven by the player's REAL status, and rewinds at end of track, so it
+// never gets stuck on "Playing…".
 function AudioCard({ uri }: { uri: string }) {
   const player = useAudioPlayer(uri);
-  const [on, setOn] = useState(false);
+  const status = useAudioPlayerStatus(player);
+  const playing = status.playing;
+
+  useEffect(() => {
+    if (status.didJustFinish) player.seekTo(0); // reset to start; status.playing flips false
+  }, [status.didJustFinish, player]);
+
   return (
     <Pressable
       style={[styles.fill, styles.audioWrap]}
-      onPress={() => {
-        if (on) player.pause();
-        else player.play();
-        setOn(!on);
-      }}
+      onPress={() => (playing ? player.pause() : player.play())}
     >
       <View style={styles.playBtn}>
-        <Text style={styles.playGlyph}>{on ? '❚❚' : '▶'}</Text>
+        <Text style={styles.playGlyph}>{playing ? '❚❚' : '▶'}</Text>
       </View>
-      <Text style={styles.audioLabel}>{on ? 'Playing…' : 'Tap to play'}</Text>
+      <Text style={styles.audioLabel}>{playing ? 'Playing…' : 'Tap to play'}</Text>
     </Pressable>
   );
 }
