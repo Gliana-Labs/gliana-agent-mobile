@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useAudioPlayer } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import showcase from '../lib/showcase.json';
 import { colors, radius, space } from '../theme';
@@ -24,9 +25,9 @@ type Item = {
   title?: string;
 };
 
-const ITEMS = (showcase.items as unknown as Item[]).filter((i) => i.type !== 'audio'); // audio has no thumbnail — skip in a visual grid
-const LABEL: Record<string, string> = { all: 'All', image: 'Image', video: 'Video', music: 'Music', brainrot: 'Brainrot' };
-const ORDER = ['image', 'video', 'music', 'brainrot'];
+const ITEMS = showcase.items as unknown as Item[];
+const LABEL: Record<string, string> = { all: 'All', image: 'Image', video: 'Video', voice: 'Voice', music: 'Music', brainrot: 'Brainrot' };
+const ORDER = ['image', 'video', 'voice', 'music', 'brainrot'];
 
 export function Showcase({ visible, onClose, onMake }: { visible: boolean; onClose: () => void; onMake: (runId: string) => void }) {
   const insets = useSafeAreaInsets();
@@ -88,6 +89,8 @@ function Card({ item, w, onMake }: { item: Item; w: number; onMake: (runId: stri
       <View style={[styles.media, { width: w, height: w }]}>
         {item.type === 'image' ? (
           <Image source={{ uri: item.url }} style={styles.fill} contentFit="cover" transition={150} onError={() => setBroken(true)} />
+        ) : item.type === 'audio' ? (
+          <AudioCard uri={item.url} />
         ) : play ? (
           <VideoPlay uri={item.url} onError={() => setBroken(true)} />
         ) : (
@@ -127,6 +130,27 @@ function VideoPlay({ uri, onError }: { uri: string; onError: () => void }) {
   return <VideoView player={player} style={styles.fill} contentFit="cover" nativeControls={false} />;
 }
 
+// Voice/music have no thumbnail — a speaker tile that plays/pauses on tap.
+function AudioCard({ uri }: { uri: string }) {
+  const player = useAudioPlayer(uri);
+  const [on, setOn] = useState(false);
+  return (
+    <Pressable
+      style={[styles.fill, styles.audioWrap]}
+      onPress={() => {
+        if (on) player.pause();
+        else player.play();
+        setOn(!on);
+      }}
+    >
+      <View style={styles.playBtn}>
+        <Text style={styles.playGlyph}>{on ? '❚❚' : '▶'}</Text>
+      </View>
+      <Text style={styles.audioLabel}>{on ? 'Playing…' : 'Tap to play'}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.ink },
   header: {
@@ -153,6 +177,8 @@ const styles = StyleSheet.create({
   media: { backgroundColor: 'rgba(0,0,0,0.4)' },
   fill: { width: '100%', height: '100%' },
   playWrap: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.ink3 },
+  audioWrap: { alignItems: 'center', justifyContent: 'center', gap: space(2), backgroundColor: colors.ink3 },
+  audioLabel: { color: colors.textFaint, fontSize: 11 },
   playBtn: {
     width: 44,
     height: 44,
