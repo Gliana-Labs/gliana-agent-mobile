@@ -11,7 +11,7 @@ import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import showcase from '../lib/showcase.json';
+import { API } from '../lib/api';
 import { colors, radius, space } from '../theme';
 
 type Item = {
@@ -25,16 +25,23 @@ type Item = {
   title?: string;
 };
 
-const ITEMS = showcase.items as unknown as Item[];
 const LABEL: Record<string, string> = { all: 'All', image: 'Image', video: 'Video', voice: 'Voice', music: 'Music', brainrot: 'Brainrot' };
 const ORDER = ['image', 'video', 'voice', 'music', 'brainrot'];
 
 export function Showcase({ visible, onClose, onMake }: { visible: boolean; onClose: () => void; onMake: (runId: string) => void }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const cats = useMemo(() => ['all', ...ORDER.filter((c) => ITEMS.some((i) => i.category === c))], []);
+  // Single source: fetch the gallery from the gateway (/v1/showcase) like /v1/models.
+  const [items, setItems] = useState<Item[]>([]);
+  useEffect(() => {
+    fetch(`${API}/v1/showcase`)
+      .then((r) => r.json())
+      .then((j) => setItems((j.items as Item[]) ?? []))
+      .catch(() => setItems([]));
+  }, []);
+  const cats = useMemo(() => ['all', ...ORDER.filter((c) => items.some((i) => i.category === c))], [items]);
   const [active, setActive] = useState('all');
-  const data = useMemo(() => (active === 'all' ? ITEMS : ITEMS.filter((i) => i.category === active)), [active]);
+  const data = useMemo(() => (active === 'all' ? items : items.filter((i) => i.category === active)), [active, items]);
   const colW = (width - space(3) * 3) / 2;
 
   return (
