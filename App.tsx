@@ -20,6 +20,7 @@ import { colors, radius, space } from './src/theme';
 import { Composer } from './src/components/Composer';
 import { MessageBubble } from './src/components/MessageBubble';
 import { Sidebar } from './src/components/Sidebar';
+import { Showcase } from './src/components/Showcase';
 import { ConnectWallet } from './src/components/ConnectWallet';
 import { MenuIcon } from './src/components/icons';
 import { Backdrop } from './src/components/Backdrop';
@@ -72,6 +73,7 @@ function Main() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [typingId, setTypingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showcaseOpen, setShowcaseOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -188,6 +190,19 @@ function Main() {
           setSidebarOpen(false);
         }}
         onDelete={deleteChat}
+        onShowcase={() => {
+          setSidebarOpen(false);
+          setShowcaseOpen(true);
+        }}
+      />
+
+      <Showcase
+        visible={showcaseOpen}
+        onClose={() => setShowcaseOpen(false)}
+        onMake={(runId) => {
+          setShowcaseOpen(false);
+          void send(`Make something with ${runId} — I'll fill in the details`);
+        }}
       />
 
       <View style={[styles.header, { paddingTop: insets.top + space(2) }]}>

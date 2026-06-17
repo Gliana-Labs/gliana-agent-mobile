@@ -16,6 +16,7 @@ export function Sidebar({
   onNew,
   onSelect,
   onDelete,
+  onShowcase,
 }: {
   visible: boolean;
   conversations: Conversation[];
@@ -24,6 +25,7 @@ export function Sidebar({
   onNew: () => void;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onShowcase: () => void;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -39,6 +41,10 @@ export function Sidebar({
         <Pressable style={styles.newBtn} onPress={onNew}>
           <PlusIcon size={16} color={colors.text} />
           <Text style={styles.newText}>New chat</Text>
+        </Pressable>
+
+        <Pressable style={styles.linkBtn} onPress={onShowcase}>
+          <Text style={styles.linkText}>✦  Showcase</Text>
         </Pressable>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: insets.bottom + space(4) }}>
@@ -97,6 +103,8 @@ const styles = StyleSheet.create({
     marginBottom: space(4),
   },
   newText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  linkBtn: { paddingVertical: space(2.5), paddingHorizontal: space(3), marginTop: -space(2), marginBottom: space(3) },
+  linkText: { color: colors.textDim, fontSize: 14 },
   empty: { color: colors.textGhost, fontSize: 13, paddingHorizontal: space(2), paddingTop: space(2) },
   row: {
     flexDirection: 'row',
