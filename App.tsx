@@ -269,7 +269,7 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
     <ScrollView contentContainerStyle={styles.empty} keyboardShouldPersistTaps="handled">
       <View style={styles.pill}>
         <View style={styles.pillDot} />
-        <Text style={styles.pillText}>60+ models · one prompt</Text>
+        <Text style={styles.pillText}>70+ models · one prompt</Text>
       </View>
       <Text style={styles.emptyTitle}>
         What should we <Text style={styles.emptyAccent}>make</Text>?
