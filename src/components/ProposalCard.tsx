@@ -24,10 +24,22 @@ import type { GenerationResult, ProposalDraft } from '../types';
  * editors (aleph-2) get a video attachment, not a hidden field. Falls back to the
  * agent's category/note hint when the schema isn't loaded yet.
  */
-function attachFromSchema(schema: ModelSchema | null): { kind: AttachKind; key: string } | null {
+// Categories that inherently take a file input — so an OPTIONAL file field (a
+// text-to-image model's optional reference image) doesn't force an attach box.
+const FILE_INPUT_CATEGORIES = new Set(['image-to-image', 'image-to-video', 'video-to-video', 'stt']);
+
+function attachFromSchema(schema: ModelSchema | null, category?: string): { kind: AttachKind; key: string } | null {
   if (!schema) return null;
-  const entry = Object.entries(schema.props).find(([, p]) => p.fileRef);
-  if (!entry) return null;
+  const fileEntries = Object.entries(schema.props).filter(([, p]) => p.fileRef);
+  if (!fileEntries.length) return null;
+  const required = new Set(schema.required ?? []);
+  // Prefer a REQUIRED file field; if none is required, only surface an attach
+  // box for file-based categories (not a text-to-image optional reference).
+  let entry = fileEntries.find(([k]) => required.has(k));
+  if (!entry) {
+    if (!category || !FILE_INPUT_CATEGORIES.has(category)) return null;
+    entry = fileEntries[0];
+  }
   const [key] = entry;
   const k = key.toLowerCase();
   const kind: AttachKind = /video/.test(k) ? 'video' : /audio|speech|sound/.test(k) ? 'audio' : 'image';
@@ -145,7 +157,7 @@ export function ProposalCard({
   }, [model, values]);
 
   // File this proposal needs — derived from the schema's fileRef field.
-  const attach = useMemo(() => attachFromSchema(schema), [schema]);
+  const attach = useMemo(() => attachFromSchema(schema, proposal.category), [schema, proposal.category]);
 
   // Billing-only duration (video editing) is measured from the source video, not
   // typed — find that field + a usable video URL to probe.
