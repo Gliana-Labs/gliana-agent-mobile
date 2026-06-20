@@ -27,12 +27,14 @@ export function Attachment({
   onChange,
   disabled,
   onBusy,
+  optional,
 }: {
   kind: AttachKind;
   value: unknown;
   onChange: (v: string | undefined) => void;
   disabled?: boolean;
   onBusy?: (busy: boolean) => void;
+  optional?: boolean;
 }) {
   const [reading, setReading] = useState(false);
   const [error, setError] = useState('');
@@ -101,7 +103,9 @@ export function Attachment({
     ? 'Uploading…'
     : hasValue
       ? `${noun[0].toUpperCase()}${noun.slice(1)} attached ✓ — upload another`
-      : `Upload ${article} ${noun} (≤40 MB)`;
+      : optional
+        ? `Optional: add a reference ${noun} (≤40 MB)`
+        : `Upload ${article} ${noun} (≤40 MB)`;
 
   return (
     <View style={{ gap: space(2) }}>

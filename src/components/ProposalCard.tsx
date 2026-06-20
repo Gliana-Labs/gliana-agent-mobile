@@ -24,26 +24,27 @@ import type { GenerationResult, ProposalDraft } from '../types';
  * editors (aleph-2) get a video attachment, not a hidden field. Falls back to the
  * agent's category/note hint when the schema isn't loaded yet.
  */
-// Categories that inherently take a file input — so an OPTIONAL file field (a
-// text-to-image model's optional reference image) doesn't force an attach box.
-const FILE_INPUT_CATEGORIES = new Set(['image-to-image', 'image-to-video', 'video-to-video', 'stt']);
-
-function attachFromSchema(schema: ModelSchema | null, category?: string): { kind: AttachKind; key: string } | null {
+function attachFromSchema(
+  schema: ModelSchema | null,
+  category?: string,
+): { kind: AttachKind; key: string; optional: boolean } | null {
   if (!schema) return null;
   const fileEntries = Object.entries(schema.props).filter(([, p]) => p.fileRef);
   if (!fileEntries.length) return null;
   const required = new Set(schema.required ?? []);
-  // Prefer a REQUIRED file field; if none is required, only surface an attach
-  // box for file-based categories (not a text-to-image optional reference).
-  let entry = fileEntries.find(([k]) => required.has(k));
-  if (!entry) {
-    if (!category || !FILE_INPUT_CATEGORIES.has(category)) return null;
-    entry = fileEntries[0];
-  }
+  // Prefer a REQUIRED file field (blocking); else the first optional one — shown
+  // but non-blocking, so a text-to-image model that also accepts a reference
+  // image offers it without demanding it.
+  const reqEntry = fileEntries.find(([k]) => required.has(k));
+  const entry = reqEntry ?? fileEntries[0];
+  const optional = !reqEntry;
   const [key] = entry;
   const k = key.toLowerCase();
-  const kind: AttachKind = /video/.test(k) ? 'video' : /audio|speech|sound/.test(k) ? 'audio' : 'image';
-  return { kind, key };
+  // Kind from the field name, falling back to the category — an STT model's file
+  // field is named `file`/`url` (no "audio" in it) but must take audio.
+  const isAudio = /audio|speech|sound/.test(k) || category === 'stt' || category === 'music';
+  const kind: AttachKind = /video/.test(k) ? 'video' : isAudio ? 'audio' : 'image';
+  return { kind, key, optional };
 }
 
 export function ProposalCard({
@@ -169,7 +170,9 @@ export function ProposalCard({
     attach?.kind === 'video' && typeof values[attach.key] === 'string' && /^https?:/.test(values[attach.key] as string)
       ? (values[attach.key] as string)
       : null;
-  const attachMissing = attach != null && (values[attach.key] === undefined || values[attach.key] === '');
+  // Only a REQUIRED attach blocks pay — an optional reference image never does.
+  const attachMissing =
+    attach != null && !attach.optional && (values[attach.key] === undefined || values[attach.key] === '');
 
   // Required fields with no value block pay (same as the web card) — avoids a
   // charge that would 400 server-side. File fields are handled by the attach box.
@@ -243,6 +246,7 @@ export function ProposalCard({
             onChange={(v) => setField(attach.key, v)}
             disabled={status === 'paying' || status === 'done'}
             onBusy={setAttachBusy}
+            optional={attach.optional}
           />
         </View>
       )}
