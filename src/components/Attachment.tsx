@@ -124,7 +124,7 @@ export function Attachment({
         style={styles.url}
         value={isUrl(value) ? value : ''}
         onChangeText={(t) => onChange(t.trim() || undefined)}
-        placeholder={kind === 'video' ? 'https://…/video.mp4' : 'https://…'}
+        placeholder={kind === 'video' ? 'https://…/video.mp4' : kind === 'audio' ? 'https://…/audio.mp3' : 'https://…/image.jpg'}
         placeholderTextColor={colors.textGhost}
         autoCapitalize="none"
         autoCorrect={false}
