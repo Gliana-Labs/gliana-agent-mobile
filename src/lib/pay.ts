@@ -70,14 +70,15 @@ export async function payAndRun(
   signer: TransactionPartialSigner,
   body: Record<string, unknown>,
 ): Promise<InferResult> {
-  // Retry once on a failed settle — a fresh request gets a fresh 402 challenge
-  // and a fresh recentBlockhash, which fixes "Blockhash not found" when a wallet
-  // approval takes longer than Solana's ~90s blockhash window.
-  let res = await attempt(signer, body);
-  if (res.status === 402) res = await attempt(signer, body);
+  // SINGLE attempt — never auto-retry. The gateway BROADCASTS the signed Solana
+  // tx, so a second attempt broadcasts a SECOND transaction and the wallet pays
+  // TWICE (a 402 can mean an in-flight tx the gateway couldn't confirm in time,
+  // not a true failure). One signature per approve; the user re-taps Approve to
+  // retry deliberately (fresh blockhash), never a silent double-pay.
+  const res = await attempt(signer, body);
 
   if (res.status === 402) {
-    throw new Error('Payment did not settle — check the wallet holds USDC on Solana and approve promptly.');
+    throw new Error('Payment did not settle — check the wallet holds USDC on Solana, then tap Approve again.');
   }
   if (res.status === 400) {
     const e = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
