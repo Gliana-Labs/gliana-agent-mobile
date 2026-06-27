@@ -58,6 +58,7 @@ export interface PropSchema {
   min?: number;
   max?: number;
   fileRef?: boolean;
+  arrayRef?: boolean; // file field taking an ARRAY of URLs (images, reference_images)
   description?: string;
 }
 export interface ModelSchema {

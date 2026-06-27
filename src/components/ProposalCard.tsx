@@ -27,7 +27,7 @@ import type { GenerationResult, ProposalDraft } from '../types';
 function attachFromSchema(
   schema: ModelSchema | null,
   category?: string,
-): { kind: AttachKind; key: string; optional: boolean } | null {
+): { kind: AttachKind; key: string; optional: boolean; multi: boolean } | null {
   if (!schema) return null;
   const fileEntries = Object.entries(schema.props).filter(([, p]) => p.fileRef);
   if (!fileEntries.length) return null;
@@ -38,13 +38,14 @@ function attachFromSchema(
   const reqEntry = fileEntries.find(([k]) => required.has(k));
   const entry = reqEntry ?? fileEntries[0];
   const optional = !reqEntry;
-  const [key] = entry;
+  const [key, prop] = entry;
   const k = key.toLowerCase();
+  const multi = !!prop.arrayRef; // images / reference_images → many files
   // Kind from the field name, falling back to the category — an STT model's file
   // field is named `file`/`url` (no "audio" in it) but must take audio.
   const isAudio = /audio|speech|sound/.test(k) || category === 'stt' || category === 'music';
   const kind: AttachKind = /video/.test(k) ? 'video' : isAudio ? 'audio' : 'image';
-  return { kind, key, optional };
+  return { kind, key, optional, multi };
 }
 
 export function ProposalCard({
@@ -171,8 +172,14 @@ export function ProposalCard({
       ? (values[attach.key] as string)
       : null;
   // Only a REQUIRED attach blocks pay — an optional reference image never does.
+  // A multi (arrayRef) field is satisfied by a non-empty array of URLs.
+  const attachVal = attach ? values[attach.key] : undefined;
   const attachMissing =
-    attach != null && !attach.optional && (values[attach.key] === undefined || values[attach.key] === '');
+    attach != null &&
+    !attach.optional &&
+    (attach.multi
+      ? !Array.isArray(attachVal) || attachVal.length === 0
+      : attachVal === undefined || attachVal === '');
 
   // Required fields with no value block pay (same as the web card) — avoids a
   // charge that would 400 server-side. File fields are handled by the attach box.
@@ -247,6 +254,7 @@ export function ProposalCard({
             disabled={status === 'paying' || status === 'done'}
             onBusy={setAttachBusy}
             optional={attach.optional}
+            multi={attach.multi}
           />
         </View>
       )}
