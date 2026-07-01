@@ -406,6 +406,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: space(4),
+    // Amber-tinted elevation — the priced card is the moment that matters, so give
+    // it real depth instead of sitting flat. Colored shadow (iOS) + elevation (Android).
+    shadowColor: colors.flame,
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: space(3) },
   cat: { color: colors.flameSoft, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -414,7 +421,7 @@ const styles = StyleSheet.create({
   chevron: { color: colors.textFaint, fontSize: 12 },
   changeHint: { color: colors.textGhost, fontSize: 10, marginTop: 2 },
   priceBox: { alignItems: 'flex-end' },
-  price: { color: colors.flameSoft, fontSize: 18, fontWeight: '700', fontFamily: 'monospace' },
+  price: { color: colors.flameSoft, fontSize: 18, fontWeight: '700', fontFamily: 'monospace', fontVariant: ['tabular-nums'] },
   priceStale: { opacity: 0.4 },
   breakdown: { color: colors.textFaint, fontSize: 12, marginTop: space(2) },
   priceUnit: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
@@ -433,7 +440,7 @@ const styles = StyleSheet.create({
   payActive: { backgroundColor: colors.flameSoft },
   payBusy: { opacity: 0.7 },
   payDone: { backgroundColor: 'rgba(52,211,153,0.15)', borderWidth: 1, borderColor: 'rgba(52,211,153,0.3)' },
-  payText: { color: '#0a0a0d', fontSize: 15, fontWeight: '700' },
+  payText: { color: '#0a0a0d', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
   payDoneText: { color: colors.green, fontSize: 15, fontWeight: '700' },
   payHint: { color: colors.textGhost, fontSize: 11, textAlign: 'center', marginTop: space(2) },
 });
