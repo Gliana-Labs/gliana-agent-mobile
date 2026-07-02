@@ -41,6 +41,8 @@ const SUGGESTIONS = [
   { tag: 'Animate', model: 'grok-imagine-video-1.5-preview', prompt: 'animate an image into a short clip', send: 'Animate my image into a short video with grok-imagine-video-1.5-preview (image-to-video) — I will attach the image' },
   { tag: 'Edit video', model: 'aleph-2', prompt: 'restyle a clip to golden-hour', send: 'Edit my video with aleph-2 (video-to-video): make it a golden-hour sunset with warm lighting — I will attach the video' },
   { tag: 'Transcribe', model: 'gpt-4o-transcribe', prompt: 'transcribe an audio file to text', send: 'Transcribe my audio file with gpt-4o-transcribe (speech-to-text) — I will attach the audio' },
+  { tag: 'Brainrot', model: 'brainrot-video', prompt: 'a chaotic italian-brainrot video', send: 'Make a brainrot video — it dances and spins chaotically' },
+  { tag: 'Scrape', model: 'scrape', prompt: 'a web page → clean markdown', send: 'Scrape https://example.com and give me the clean markdown' },
 ];
 
 // Per-category glyphs (16×16, fill=currentColor) — same paths as the web cards.
@@ -282,7 +284,7 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
           <Pressable key={s.tag} style={styles.card} onPress={() => onPick(s.send)}>
             <View style={styles.cardHead}>
               <Svg width={14} height={14} viewBox="0 0 16 16" fill={colors.flameSoft}>
-                <Path d={CAT_ICON[s.tag]} />
+                <Path d={CAT_ICON[s.tag] ?? CAT_ICON.Image} />
               </Svg>
               <Text style={styles.cardTag}>{s.tag}</Text>
             </View>

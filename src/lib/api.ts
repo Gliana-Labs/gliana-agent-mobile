@@ -76,8 +76,12 @@ export async function fetchSchema(model: string): Promise<ModelSchema> {
 
 export { usd } from '../theme';
 
-/** A generation the agent wants approved: exact /v1/infer body + gateway quote. */
+/** An action the agent wants approved: a model gen, a utility tool, or a recipe.
+ *  kind/endpoint optional for back-compat (default = model → /v1/infer).
+ *  model → POST /v1/infer { model, ...input }; tool/recipe → POST endpoint { ...input }. */
 export interface Proposal {
+  kind?: 'model' | 'tool' | 'recipe';
+  endpoint?: string;
   model: string;
   category: string;
   input: Record<string, unknown>;

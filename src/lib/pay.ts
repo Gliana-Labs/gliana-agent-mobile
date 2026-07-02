@@ -69,13 +69,14 @@ function guessContentType(url: string, key: string): string {
 export async function payAndRun(
   signer: TransactionPartialSigner,
   body: Record<string, unknown>,
+  endpoint = '/v1/infer',
 ): Promise<InferResult> {
   // SINGLE attempt — never auto-retry. The gateway BROADCASTS the signed Solana
   // tx, so a second attempt broadcasts a SECOND transaction and the wallet pays
   // TWICE (a 402 can mean an in-flight tx the gateway couldn't confirm in time,
   // not a true failure). One signature per approve; the user re-taps Approve to
   // retry deliberately (fresh blockhash), never a silent double-pay.
-  const res = await attempt(signer, body);
+  const res = await attempt(signer, body, endpoint);
 
   if (res.status === 402) {
     throw new Error('Payment did not settle — check the wallet holds USDC on Solana, then tap Approve again.');
@@ -91,13 +92,13 @@ export async function payAndRun(
   return (await res.json()) as InferResult;
 }
 
-function attempt(signer: TransactionPartialSigner, body: Record<string, unknown>): Promise<Response> {
+function attempt(signer: TransactionPartialSigner, body: Record<string, unknown>, endpoint: string): Promise<Response> {
   // Fresh client per attempt so a stale challenge is never reused.
   const mppx = Mppx.create({
     methods: [solana.charge({ signer: signer as never, ...(SOLANA_RPC ? { rpcUrl: SOLANA_RPC } : {}) })] as never,
     polyfill: false,
   });
-  return mppx.fetch(`${API}/v1/infer`, {
+  return mppx.fetch(`${API}${endpoint}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),

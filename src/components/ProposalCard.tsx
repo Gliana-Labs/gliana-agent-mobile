@@ -5,7 +5,7 @@
  * wallet (MWA). Ports the core of the web app's proposal card.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useVideoPlayer } from 'expo-video';
 import { fetchSchema, quote, usd, type ModelSchema, type Proposal, type Quote } from '../lib/api';
 import { payAndRun } from '../lib/pay';
@@ -73,7 +73,13 @@ export function ProposalCard({
   const [status, setStatus] = useState<'idle' | 'paying' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
+  // Kind: model (schema form + picker) vs tool/recipe (flat price, simple editable
+  // fields from the agent's input; no schema/picker/attachments).
+  const kind = proposal.kind ?? 'model';
+  const isModel = kind === 'model';
+
   useEffect(() => {
+    if (!isModel) return; // tools/recipes have no model schema
     let alive = true;
     setSchema(null);
     fetchSchema(model)
@@ -102,6 +108,7 @@ export function ProposalCard({
   // resolution tier) so the shown price equals what /v1/infer will charge.
   const reqRef = useRef(0);
   useEffect(() => {
+    if (!isModel) return; // tool/recipe uses the flat proposal quote (402 is authoritative)
     const id = ++reqRef.current;
     // Duration can be a number, a numeric string ("8"), a suffixed enum ("8s"),
     // or a dropdown value — parseFloat reads the leading number from any of them.
@@ -151,12 +158,13 @@ export function ProposalCard({
   }
 
   const body = useMemo(() => {
-    const out: Record<string, unknown> = { model };
+    // model → { model, ...values }; tool/recipe → { ...values } (no model field).
+    const out: Record<string, unknown> = isModel ? { model } : {};
     for (const [k, v] of Object.entries(values)) {
       if (v !== undefined && v !== '') out[k] = v;
     }
     return out;
-  }, [model, values]);
+  }, [isModel, model, values]);
 
   // File this proposal needs — derived from the schema's fileRef field.
   const attach = useMemo(() => attachFromSchema(schema, proposal.category), [schema, proposal.category]);
@@ -202,8 +210,10 @@ export function ProposalCard({
     setStatus('paying');
     setError(null);
     try {
-      const res = await payAndRun(signer, body);
-      const media = asResult(res);
+      const res = await payAndRun(signer, body, proposal.endpoint ?? '/v1/infer');
+      // Models nest the payload under `output`; tools/recipes return url/markdown/…
+      // at the top level — feed the whole response in as the output to render from.
+      const media = asResult(isModel ? res : { costMicroUsd: res.costMicroUsd, output: res });
       setStatus('done');
       onApproved(media);
     } catch (e) {
@@ -217,15 +227,15 @@ export function ProposalCard({
       <View style={styles.head}>
         <Pressable
           style={{ flex: 1, minWidth: 0 }}
-          onPress={() => setPickerOpen(true)}
-          disabled={status === 'paying' || status === 'done'}
+          onPress={() => isModel && setPickerOpen(true)}
+          disabled={!isModel || status === 'paying' || status === 'done'}
         >
           <Text style={styles.cat}>{proposal.category}</Text>
           <View style={styles.modelRow}>
             <Text style={styles.model} numberOfLines={1}>{model}</Text>
-            <Text style={styles.chevron}>▾</Text>
+            {isModel && <Text style={styles.chevron}>▾</Text>}
           </View>
-          <Text style={styles.changeHint}>tap to change</Text>
+          {isModel && <Text style={styles.changeHint}>tap to change</Text>}
         </Pressable>
         <View style={styles.priceBox}>
           <Text style={[styles.price, pricing && styles.priceStale]}>{usd(q.costMicroUsd)}</Text>
@@ -235,13 +245,35 @@ export function ProposalCard({
         </View>
       </View>
 
-      {schema ? (
-        <View style={{ marginTop: space(4) }}>
-          <SchemaFields schema={schema} values={values} onChange={setField} />
-        </View>
+      {isModel ? (
+        schema ? (
+          <View style={{ marginTop: space(4) }}>
+            <SchemaFields schema={schema} values={values} onChange={setField} />
+          </View>
+        ) : (
+          <View style={{ marginTop: space(4) }}>
+            <ActivityIndicator color={colors.flameSoft} />
+          </View>
+        )
       ) : (
-        <View style={{ marginTop: space(4) }}>
-          <ActivityIndicator color={colors.flameSoft} />
+        <View style={{ marginTop: space(4), gap: space(2) }}>
+          {Object.entries(values).map(([k, v]) => {
+            const isObj = typeof v === 'object' && v !== null;
+            return (
+              <View key={k}>
+                <Text style={styles.fieldLabel}>{k}</Text>
+                <TextInput
+                  value={isObj ? JSON.stringify(v) : String(v ?? '')}
+                  editable={!isObj && status !== 'paying' && status !== 'done'}
+                  onChangeText={(t) => setField(k, t)}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholderTextColor={colors.textGhost}
+                  style={styles.fieldInput}
+                />
+              </View>
+            );
+          })}
         </View>
       )}
 
@@ -275,12 +307,14 @@ export function ProposalCard({
         </Text>
       )}
 
-      <Pressable
-        onPress={() => Linking.openURL(`https://ai.glianalabs.com/models/${model}`)}
-        style={styles.detailsLink}
-      >
-        <Text style={styles.detailsText}>View model details ↗</Text>
-      </Pressable>
+      {isModel && (
+        <Pressable
+          onPress={() => Linking.openURL(`https://ai.glianalabs.com/models/${model}`)}
+          style={styles.detailsLink}
+        >
+          <Text style={styles.detailsText}>View model details ↗</Text>
+        </Pressable>
+      )}
 
       {error && <Text style={styles.error}>{error}</Text>}
 
@@ -425,6 +459,18 @@ const styles = StyleSheet.create({
   priceStale: { opacity: 0.4 },
   breakdown: { color: colors.textFaint, fontSize: 12, marginTop: space(2) },
   priceUnit: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
+  fieldLabel: { color: colors.textFaint, fontSize: 11, fontFamily: 'monospace', marginBottom: 3 },
+  fieldInput: {
+    color: colors.text,
+    fontSize: 14,
+    fontFamily: 'monospace',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: space(3),
+    paddingVertical: space(2),
+  },
   detailsLink: { marginTop: space(3) },
   detailsText: { color: colors.textFaint, fontSize: 12 },
   error: { color: colors.red, fontSize: 13, marginTop: space(3), lineHeight: 18 },
