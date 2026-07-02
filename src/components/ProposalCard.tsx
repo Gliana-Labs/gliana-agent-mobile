@@ -77,11 +77,6 @@ export function ProposalCard({
   // fields from the agent's input; no schema/picker/attachments).
   const kind = proposal.kind ?? 'model';
   const isModel = kind === 'model';
-  // Fields the agent proposed as objects (e.g. face-compare a/b) — edited as JSON.
-  const objectFields = useMemo(
-    () => new Set(Object.keys(proposal.input).filter((k) => proposal.input[k] !== null && typeof proposal.input[k] === 'object')),
-    [proposal.input],
-  );
 
   useEffect(() => {
     if (!isModel) return; // tools/recipes have no model schema
@@ -262,25 +257,40 @@ export function ProposalCard({
         )
       ) : (
         <View style={{ marginTop: space(4), gap: space(2) }}>
-          {Object.entries(values).map(([k, v]) => {
-            // Object fields (e.g. face-compare a/b) edited as JSON, parsed back on
-            // change so the nested URLs stay fillable. Invalid JSON 400s pre-charge.
-            const asJson = objectFields.has(k);
-            const display = v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v ?? '');
-            return (
+          {Object.entries(values).flatMap(([k, v]) => {
+            const editable = status !== 'paying' && status !== 'done';
+            // Nested object (e.g. face-compare a:{image_url}) → one input PER leaf,
+            // so the user types the value directly and can't break the JSON shape.
+            if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+              return Object.entries(v as Record<string, unknown>).map(([nk, nv]) => (
+                <View key={`${k}.${nk}`}>
+                  <Text style={styles.fieldLabel}>{k} · {nk}</Text>
+                  <TextInput
+                    value={String(nv ?? '')}
+                    editable={editable}
+                    onChangeText={(t) => setField(k, { ...(values[k] as Record<string, unknown>), [nk]: t })}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    placeholderTextColor={colors.textGhost}
+                    style={styles.fieldInput}
+                  />
+                </View>
+              ));
+            }
+            return [
               <View key={k}>
                 <Text style={styles.fieldLabel}>{k}</Text>
                 <TextInput
-                  value={display}
-                  editable={status !== 'paying' && status !== 'done'}
-                  onChangeText={(t) => setField(k, asJson ? tryJson(t) : t)}
+                  value={Array.isArray(v) ? JSON.stringify(v) : String(v ?? '')}
+                  editable={editable}
+                  onChangeText={(t) => setField(k, Array.isArray(v) ? tryJson(t) : t)}
                   autoCapitalize="none"
                   autoCorrect={false}
                   placeholderTextColor={colors.textGhost}
                   style={styles.fieldInput}
                 />
-              </View>
-            );
+              </View>,
+            ];
           })}
         </View>
       )}
