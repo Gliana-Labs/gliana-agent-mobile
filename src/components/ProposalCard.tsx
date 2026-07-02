@@ -77,6 +77,11 @@ export function ProposalCard({
   // fields from the agent's input; no schema/picker/attachments).
   const kind = proposal.kind ?? 'model';
   const isModel = kind === 'model';
+  // Fields the agent proposed as objects (e.g. face-compare a/b) — edited as JSON.
+  const objectFields = useMemo(
+    () => new Set(Object.keys(proposal.input).filter((k) => proposal.input[k] !== null && typeof proposal.input[k] === 'object')),
+    [proposal.input],
+  );
 
   useEffect(() => {
     if (!isModel) return; // tools/recipes have no model schema
@@ -258,14 +263,17 @@ export function ProposalCard({
       ) : (
         <View style={{ marginTop: space(4), gap: space(2) }}>
           {Object.entries(values).map(([k, v]) => {
-            const isObj = typeof v === 'object' && v !== null;
+            // Object fields (e.g. face-compare a/b) edited as JSON, parsed back on
+            // change so the nested URLs stay fillable. Invalid JSON 400s pre-charge.
+            const asJson = objectFields.has(k);
+            const display = v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v ?? '');
             return (
               <View key={k}>
                 <Text style={styles.fieldLabel}>{k}</Text>
                 <TextInput
-                  value={isObj ? JSON.stringify(v) : String(v ?? '')}
-                  editable={!isObj && status !== 'paying' && status !== 'done'}
-                  onChangeText={(t) => setField(k, t)}
+                  value={display}
+                  editable={status !== 'paying' && status !== 'done'}
+                  onChangeText={(t) => setField(k, asJson ? tryJson(t) : t)}
                   autoCapitalize="none"
                   autoCorrect={false}
                   placeholderTextColor={colors.textGhost}
@@ -389,9 +397,24 @@ export function ProposalCard({
   );
 }
 
+const MEDIA_EXT = /\.(png|jpe?g|webp|gif|avif|bmp|svg|mp4|webm|mov|m4v|mp3|wav|ogg|oga|m4a|flac|aac)(\?|#|$)/i;
+
+/** Parse a JSON-object field edit back to an object; keep the raw string if invalid. */
+function tryJson(s: string): unknown {
+  try {
+    const p = JSON.parse(s);
+    return p !== null && typeof p === 'object' ? p : s;
+  } catch {
+    return s;
+  }
+}
+
 function asResult(res: { costMicroUsd: number; output: unknown }): GenerationResult {
   const o = res.output as Record<string, unknown> | null;
-  if (o && typeof o === 'object' && typeof o.url === 'string') {
+  // Only render `url` as media when it points at a media FILE (has an ext or a
+  // declared contentType). A bare source/page url (scrape returns { url: page,
+  // markdown }) must fall through to raw, not render as a broken image.
+  if (o && typeof o === 'object' && typeof o.url === 'string' && (typeof o.contentType === 'string' || MEDIA_EXT.test(o.url))) {
     return {
       costMicroUsd: res.costMicroUsd,
       url: o.url as string,
