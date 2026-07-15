@@ -37,6 +37,19 @@ https://expo.dev/artifacts/eas/N1xanlDLrFAbf3NEU6DnoGuYXvvg9feSPEGQ-gs27JU.apk
 Rebuild: `npx eas-cli build -p android --profile dapp-store`
 Keystore backup: `npx eas-cli credentials -p android` → Download credentials.
 
+## Release upload
+
+**dApp File:** the release APK (download from the expo.dev link above, upload the
+`.apk` as-is — it is already release-signed).
+
+**What's New:**
+
+> First release. Describe what you want — the agent picks from 70+ AI models
+> (image, video, voice, music, animate, transcribe), quotes the exact price,
+> and generates after a single tap-to-pay from your Solana wallet via Mobile
+> Wallet Adapter. Browse the showcase for real examples. No signup, no
+> subscription — pay only for what you make.
+
 ## Pre-submit checklist
 
 - [ ] One real MWA paid generation on a physical phone with this exact APK
