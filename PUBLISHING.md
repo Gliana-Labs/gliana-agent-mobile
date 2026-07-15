@@ -40,7 +40,6 @@ cd android && ./gradlew assembleRelease
 > falls back to the debug keystore when unset (local smoke builds). Just export
 > the env vars and run `./gradlew assembleRelease`. If you ever re-run
 > `npx expo prebuild --clean`, re-apply that block (plain prebuild keeps it).
-> release `signingConfig` after each `prebuild`.
 
 ## 3. Publish with the dApp Store CLI
 ```bash
