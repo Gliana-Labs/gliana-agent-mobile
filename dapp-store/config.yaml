@@ -23,9 +23,18 @@ app:
 release:
   address: # filled by the CLI on `create release`
   media:
-    # TODO: add ≥4 phone screenshots captured from the Seeker
+    - purpose: banner
+      uri: ./media/banner-1200x600.png
+    # TODO: capture ≥4 phone screenshots on the device (identical dimensions):
+    # wallet connect, a proposal card with the price, a generated result, chat.
     - purpose: screenshot
       uri: ./media/screenshot-1.png
+    - purpose: screenshot
+      uri: ./media/screenshot-2.png
+    - purpose: screenshot
+      uri: ./media/screenshot-3.png
+    - purpose: screenshot
+      uri: ./media/screenshot-4.png
   files: []
   catalog:
     en-US:
@@ -34,10 +43,11 @@ release:
       long_description: >
         Gliana Agent picks the right AI model for what you describe, quotes the exact
         price, and you approve it with one tap — paid in USDC from your Solana wallet
-        via Mobile Wallet Adapter. 59 models across image, video, voice, music,
+        via Mobile Wallet Adapter. 70+ models across image, video, voice, music,
         animate and transcribe. No signup, no API key, no subscription — you only pay
         for what you generate.
       new_in_version: First release.
       saga_features: Pay-per-result with Mobile Wallet Adapter (Seed Vault).
       android_details:
-        - TODO
+        - Native Android app built for Seeker — payments via Mobile Wallet
+          Adapter (Seed Vault); no Google Play services required.
