@@ -1,0 +1,6 @@
+# Cloud builds run their own prebuild + EAS-managed signing; the committed
+# android/ (with the GLIANA_UPLOAD_* local signing) is for local builds only.
+/android
+*.keystore
+*.jks
+dapp-store/media
