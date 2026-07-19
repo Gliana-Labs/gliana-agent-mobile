@@ -30,9 +30,14 @@ Paste-ready values for the publisher portal. Assets referenced are in `./media/`
 
 ## APK
 
-Release-signed universal APK (EAS-managed keystore, verified non-debug):
+**CURRENT — v1.0.1 (upload this one):**
+https://expo.dev/artifacts/eas/A67MjdoJrtGNflfYISzk9oklAbJu1S3Wz1lwaPxYyY0.apk
+`com.glianalabs.agent` · versionCode 2 · versionName 1.0.1 · same keystore
+(cert SHA-256 e00765c6… matches v1.0.0 — store accepts it as an update).
+Contains the MWA payment fix; the listed v1.0.0 cannot settle payments.
+
+v1.0.0 (superseded):
 https://expo.dev/artifacts/eas/N1xanlDLrFAbf3NEU6DnoGuYXvvg9feSPEGQ-gs27JU.apk
-`com.glianalabs.agent` · versionCode 1 · versionName 1.0.0 · minSdk 24
 
 Rebuild: `npx eas-cli build -p android --profile dapp-store`
 Keystore backup: `npx eas-cli credentials -p android` → Download credentials.
