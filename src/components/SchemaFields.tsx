@@ -63,9 +63,16 @@ function Field({
   const label = (
     <View style={styles.labelRow}>
       <Text style={styles.label}>{name}</Text>
-      {required && <Text style={styles.req}>required</Text>}
+      {required ? <Text style={styles.req}>required</Text> : <Text style={styles.opt}>optional</Text>}
     </View>
   );
+  // Persistent field description (the placeholder disappears once a value is
+  // typed — mirror the web card and keep it visible below the input).
+  const caption = spec.description ? (
+    <Text style={styles.caption} numberOfLines={3}>
+      {spec.description}
+    </Text>
+  ) : null;
 
   // Enum → chip selector
   if (spec.enum && spec.enum.length > 0) {
@@ -87,6 +94,7 @@ function Field({
             );
           })}
         </View>
+        {caption}
       </View>
     );
   }
@@ -94,14 +102,17 @@ function Field({
   // Boolean → switch
   if (spec.type === 'boolean') {
     return (
-      <View style={styles.boolRow}>
-        {label}
-        <Switch
-          value={Boolean(value ?? spec.default ?? false)}
-          onValueChange={onChange}
-          trackColor={{ true: colors.flame, false: colors.surfaceStrong }}
-          thumbColor={colors.text}
-        />
+      <View>
+        <View style={styles.boolRow}>
+          {label}
+          <Switch
+            value={Boolean(value ?? spec.default ?? false)}
+            onValueChange={onChange}
+            trackColor={{ true: colors.flame, false: colors.surfaceStrong }}
+            thumbColor={colors.text}
+          />
+        </View>
+        {caption}
       </View>
     );
   }
@@ -135,7 +146,7 @@ function Field({
     <View>
       <View style={styles.labelRow}>
         <Text style={styles.label}>{name}</Text>
-        {required && <Text style={styles.req}>required</Text>}
+        {required ? <Text style={styles.req}>required</Text> : <Text style={styles.opt}>optional</Text>}
         {range && <Text style={styles.range}>{range}</Text>}
       </View>
       <TextInput
@@ -144,12 +155,13 @@ function Field({
         onChangeText={(t) => onChange(isNumber ? (t === '' ? undefined : Number(t)) : t)}
         onBlur={commitNumber}
         onEndEditing={commitNumber}
-        placeholder={spec.description ?? (isNumber ? (range ?? '0') : `Enter ${name}`)}
+        placeholder={isNumber ? (range ?? '0') : `Enter ${name}`}
         placeholderTextColor={colors.textGhost}
         keyboardType={isNumber ? 'numeric' : 'default'}
         maxLength={!isNumber && typeof spec.max === 'number' ? spec.max : undefined}
         multiline={name === 'prompt' || name === 'text'}
       />
+      {caption}
     </View>
   );
 }
@@ -169,6 +181,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   range: { color: colors.textGhost, fontSize: 10, fontFamily: 'monospace' },
+  opt: {
+    color: colors.textGhost,
+    fontSize: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  caption: { color: colors.textGhost, fontSize: 11, lineHeight: 15, marginTop: space(1.5) },
   input: {
     backgroundColor: colors.surface,
     borderWidth: 1,
