@@ -1,7 +1,13 @@
 diff --git a/node_modules/@solana/mpp/dist/client/Charge.js b/node_modules/@solana/mpp/dist/client/Charge.js
-index c2e7ba3..7ec7139 100644
+index c2e7ba3..8b6c8b3 100644
 --- a/node_modules/@solana/mpp/dist/client/Charge.js
 +++ b/node_modules/@solana/mpp/dist/client/Charge.js
+@@ -1,4 +1,4 @@
+-import { AccountRole, address, appendTransactionMessageInstructions, createSolanaRpc, createTransactionMessage, getBase64EncodedWireTransaction, partiallySignTransactionMessageWithSigners, pipe, prependTransactionMessageInstructions, setTransactionMessageFeePayer, setTransactionMessageFeePayerSigner, setTransactionMessageLifetimeUsingBlockhash, signature as toSignature, signTransactionMessageWithSigners, } from '@solana/kit';
++import { AccountRole, address, appendTransactionMessageInstructions, compileTransaction, createSolanaRpc, createTransactionMessage, getBase64EncodedWireTransaction, partiallySignTransactionMessageWithSigners, pipe, prependTransactionMessageInstructions, setTransactionMessageFeePayer, setTransactionMessageFeePayerSigner, setTransactionMessageLifetimeUsingBlockhash, signature as toSignature, signTransactionMessageWithSigners, } from '@solana/kit';
+ import { getSetComputeUnitLimitInstruction, getSetComputeUnitPriceInstruction } from '@solana-program/compute-budget';
+ import { getTransferSolInstruction } from '@solana-program/system';
+ import { findAssociatedTokenPda, getCreateAssociatedTokenIdempotentInstruction, getTransferCheckedInstruction, } from '@solana-program/token';
 @@ -211,12 +211,13 @@ export async function buildChargeTransaction(parameters) {
      }
      onProgress?.({ type: 'signing' });
@@ -22,3 +28,20 @@ index c2e7ba3..7ec7139 100644
      const txMessage = pipe(createTransactionMessage({ version: 0 }), msg => useServerFeePayer
          ? setTransactionMessageFeePayer(address(feePayerKey), msg)
          : setTransactionMessageFeePayerSigner(signer, msg), msg => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, msg), msg => appendTransactionMessageInstructions(instructions, msg), 
+@@ -225,6 +226,16 @@ export async function buildChargeTransaction(parameters) {
+         getSetComputeUnitPriceInstruction({ microLamports: parameters.computeUnitPrice ?? 1n }),
+         getSetComputeUnitLimitInstruction({ units: parameters.computeUnitLimit ?? 200_000 }),
+     ], msg));
++    // PATCHED (gliana): a Mobile Wallet Adapter wallet signs its own
++    // re-serialization of the transaction; extracting that signature and
++    // attaching it to OUR bytes fails signature verification server-side
++    // ("SignatureFailure"). When the signer can sign the wire transaction
++    // directly, use the wallet's fully-signed bytes verbatim.
++    const anySigner = signer;
++    if (!useServerFeePayer && anySigner && typeof anySigner.signWireTransaction === 'function') {
++        const unsignedWire = getBase64EncodedWireTransaction(compileTransaction(txMessage));
++        return await anySigner.signWireTransaction(unsignedWire);
++    }
+     // When server pays fees, partially sign (only the transfer authority).
+     // The server will add its fee payer signature before broadcasting.
+     const signedTx = useServerFeePayer

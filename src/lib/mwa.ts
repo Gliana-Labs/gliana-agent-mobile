@@ -109,6 +109,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const addr = address(account.address);
     return {
       address: addr,
+      // Preferred path (see the @solana/mpp client patch): hand the wallet the
+      // unsigned wire transaction and submit ITS signed bytes verbatim. Wallets
+      // re-serialize before signing, so a signature extracted from their bytes
+      // does not verify over ours ("SignatureFailure" at the gateway).
+      async signWireTransaction(unsignedWireB64: string): Promise<string> {
+        const { signed_payloads } = await transact(async (wallet) => {
+          await wallet.reauthorize({ auth_token: authToken, identity: APP_IDENTITY });
+          return wallet.signTransactions({ payloads: [unsignedWireB64] });
+        });
+        if (!signed_payloads?.[0]) throw new Error('Wallet returned no signed transaction');
+        return signed_payloads[0];
+      },
       async signTransactions(
         transactions: readonly Transaction[],
       ): Promise<readonly SignatureDictionary[]> {
