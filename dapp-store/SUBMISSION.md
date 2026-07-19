@@ -42,7 +42,14 @@ Keystore backup: `npx eas-cli credentials -p android` → Download credentials.
 **dApp File:** the release APK (download from the expo.dev link above, upload the
 `.apk` as-is — it is already release-signed).
 
-**What's New:**
+**What's New (v1.0.1, versionCode 2):**
+
+> Wallet payments fixed — transactions signed with Phantom, Solflare, or Seed
+> Vault now settle reliably. Also new: every model setting shows its
+> description and whether it's required or optional, and clearer messages when
+> your connection blips while switching apps.
+
+**What's New (v1.0.0, original):**
 
 > First release. Describe what you want — the agent picks from 70+ AI models
 > (image, video, voice, music, animate, transcribe), quotes the exact price,
