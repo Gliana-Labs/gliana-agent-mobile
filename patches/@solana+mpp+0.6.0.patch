@@ -1,0 +1,24 @@
+diff --git a/node_modules/@solana/mpp/dist/client/Charge.js b/node_modules/@solana/mpp/dist/client/Charge.js
+index c2e7ba3..7ec7139 100644
+--- a/node_modules/@solana/mpp/dist/client/Charge.js
++++ b/node_modules/@solana/mpp/dist/client/Charge.js
+@@ -211,12 +211,13 @@ export async function buildChargeTransaction(parameters) {
+     }
+     onProgress?.({ type: 'signing' });
+     // Use server-provided blockhash if available, otherwise fetch one.
+-    const latestBlockhash = serverBlockhash
+-        ? {
+-            blockhash: serverBlockhash,
+-            lastValidBlockHeight: BigInt(0), // Server doesn't provide this; tx lifetime is managed by the blockhash itself.
+-        }
+-        : (await rpc.getLatestBlockhash().send()).value;
++    // PATCHED (gliana): always fetch a FRESH blockhash at build time. The
++    // server's challenge blockhash is already seconds old at mint and the
++    // Mobile Wallet Adapter approval flow adds 15-60s before broadcast, so
++    // using it makes the tx expire in the mempool (confirmation timeout).
++    // The server verifies the network, not blockhash equality, so fresh is valid.
++    const latestBlockhash = (await rpc.getLatestBlockhash().send()).value;
++    void serverBlockhash;
+     const txMessage = pipe(createTransactionMessage({ version: 0 }), msg => useServerFeePayer
+         ? setTransactionMessageFeePayer(address(feePayerKey), msg)
+         : setTransactionMessageFeePayerSigner(signer, msg), msg => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, msg), msg => appendTransactionMessageInstructions(instructions, msg), 
