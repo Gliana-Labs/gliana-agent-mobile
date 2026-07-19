@@ -76,7 +76,20 @@ export async function payAndRun(
   // TWICE (a 402 can mean an in-flight tx the gateway couldn't confirm in time,
   // not a true failure). One signature per approve; the user re-taps Approve to
   // retry deliberately (fresh blockhash), never a silent double-pay.
-  const res = await attempt(signer, body, endpoint);
+  let res: Response;
+  try {
+    res = await attempt(signer, body, endpoint);
+  } catch (e) {
+    // Android drops the app's network for a beat when switching back from the
+    // wallet app — surfaces as UnknownHostException / "Network request failed".
+    // Happens before or after signing, so never auto-retry; tell the user the
+    // truth instead of a raw java exception.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/unknownhost|unable to resolve|network request failed|fetch failed/i.test(msg)) {
+      throw new Error('Network hiccup while switching apps — check your connection and tap Approve again.');
+    }
+    throw e;
+  }
 
   if (res.status === 402) {
     throw new Error('Payment did not settle — check the wallet holds USDC on Solana, then tap Approve again.');
