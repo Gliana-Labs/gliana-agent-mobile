@@ -46,7 +46,7 @@ release:
         via Mobile Wallet Adapter. 70+ models across image, video, voice, music,
         animate and transcribe. No signup, no API key, no subscription — you only pay
         for what you generate.
-      new_in_version: First release.
+      new_in_version: Fixed wallet payments — transactions signed via Mobile Wallet Adapter now settle reliably.
       saga_features: Pay-per-result with Mobile Wallet Adapter (Seed Vault).
       android_details:
         - Native Android app built for Seeker — payments via Mobile Wallet
