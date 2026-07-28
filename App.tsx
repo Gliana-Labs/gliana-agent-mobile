@@ -36,8 +36,8 @@ const OFFLINE_REPLY = 'The agent is unreachable right now — give it a moment a
 const SUGGESTIONS = [
   { tag: 'Image', model: 'nano-banana-2', prompt: 'a paper crane, minimal logo style on cream', send: 'Create an image with nano-banana-2: a paper crane, minimal logo style on cream' },
   { tag: 'Video', model: 'seedance-2.0', prompt: 'a lighthouse in a storm, 5 seconds', send: 'Make a 5-second video with seedance-2.0: a lighthouse in a storm' },
-  { tag: 'Voice', model: 'tts-1', prompt: 'read a line aloud in a calm, warm voice', send: 'Use tts-1 to read aloud: Welcome to GlianaAI — pay per result, no signup.' },
-  { tag: 'Music', model: 'music-2.6', prompt: 'a lo-fi track for a rainy night', send: 'Make a track with music-2.6: lo-fi beats for a rainy night' },
+  { tag: 'Voice', model: 'eleven-v3', prompt: 'read a line aloud in a calm, warm voice', send: 'Use eleven-v3 to read aloud: Welcome to GlianaAI — pay per result, no signup.' },
+  { tag: 'Music', model: 'music-v2', prompt: 'a lo-fi track for a rainy night', send: 'Make a track with music-v2: lo-fi beats for a rainy night' },
   { tag: 'Animate', model: 'grok-imagine-video-1.5-preview', prompt: 'animate an image into a short clip', send: 'Animate my image into a short video with grok-imagine-video-1.5-preview (image-to-video) — I will attach the image' },
   { tag: 'Edit video', model: 'aleph-2', prompt: 'restyle a clip to golden-hour', send: 'Edit my video with aleph-2 (video-to-video): make it a golden-hour sunset with warm lighting — I will attach the video' },
   { tag: 'Transcribe', model: 'gpt-4o-transcribe', prompt: 'transcribe an audio file to text', send: 'Transcribe my audio file with gpt-4o-transcribe (speech-to-text) — I will attach the audio' },
@@ -271,7 +271,7 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
     <ScrollView contentContainerStyle={styles.empty} keyboardShouldPersistTaps="handled">
       <View style={styles.pill}>
         <View style={styles.pillDot} />
-        <Text style={styles.pillText}>70+ models · one prompt</Text>
+        <Text style={styles.pillText}>90+ models · one prompt</Text>
       </View>
       <Text style={styles.emptyTitle}>
         What should we <Text style={styles.emptyAccent}>make</Text>?
