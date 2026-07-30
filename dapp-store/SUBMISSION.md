@@ -36,7 +36,7 @@ Paste-ready values for the publisher portal. Assets referenced are in `./media/`
 ## APK
 
 **CURRENT — v1.0.1 versionCode 3 (upload this one):**
-Build: https://expo.dev/accounts/glianalabs/projects/gliana-agent-mobile/builds/37a17203-2204-42b1-80ad-c151ecc7036e
+https://expo.dev/artifacts/eas/MGk9sE5jYPEHnlml2p943ArzLcnAqJybLDRIsP-2HgQ.apk
 `com.glianalabs.agent` · versionCode 3 · versionName 1.0.1 · same keystore
 (Build Credentials kSvbYdoSqO — the store only accepts an update signed with
 the original cert). Contains the MWA payment fix AND the tiles/model-count
@@ -58,11 +58,18 @@ Keystore backup: `npx eas-cli credentials -p android` → Download credentials.
 
 **What's New (v1.0.1, versionCode 3 — upload this text):**
 
-> Wallet payments fixed — transactions signed with Phantom, Solflare or Seed
-> Vault now settle reliably. The agent can now also run utility tools, not just
-> generate: pull structured data out of a web page, summarise a video, read a
-> document, make social cards. Every setting shows its description and whether
-> it's required, and connection blips while switching apps explain themselves.
+> Wallet payments are fixed. Transactions signed with Phantom, Solflare or Seed
+> Vault now settle reliably — if payments failed for you before, this is the
+> update.
+>
+> The agent also does more than generate now. Alongside 90+ models for image,
+> video, voice and music, it can run utility tools: pull structured data out of a
+> web page, summarise a YouTube video, read a document, or build a social card.
+> Ask for what you want and it picks the right one.
+>
+> Smaller things: every model setting shows what it does and whether it's
+> required, and if your connection blips while switching to your wallet, the app
+> now says so plainly instead of failing silently.
 
 **What's New (v1.0.1, versionCode 2 — built, never uploaded):**
 

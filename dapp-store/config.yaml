@@ -54,10 +54,19 @@ release:
         No signup, no API key, no subscription, and no balance to top up — you pay
         per result, and nothing is charged if a request is rejected.
       new_in_version: >
-        Wallet payments fixed — transactions signed with Phantom, Solflare or Seed
-        Vault now settle reliably. The agent can now run utility tools too, not just
-        generate: pull structured data out of a web page, summarise a video, read a
-        document, make social cards.
+        Wallet payments are fixed — transactions signed with Phantom, Solflare or
+        Seed Vault now settle reliably. If payments failed for you before, this is
+        the update.
+
+
+        The agent also does more than generate now: alongside 90+ models it can run
+        utility tools — pull structured data out of a web page, summarise a YouTube
+        video, read a document, build a social card.
+
+
+        Smaller things: every model setting shows what it does and whether it is
+        required, and connection blips while switching to your wallet now explain
+        themselves.
       saga_features: Pay-per-result with Mobile Wallet Adapter (Seed Vault).
       android_details:
         - Native Android app built for Seeker — payments via Mobile Wallet
