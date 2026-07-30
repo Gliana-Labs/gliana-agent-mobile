@@ -35,12 +35,16 @@ Paste-ready values for the publisher portal. Assets referenced are in `./media/`
 
 ## APK
 
-**CURRENT — v1.0.1 versionCode 4 (upload this one):** building, link below when done.
+**CURRENT — v1.0.2 versionCode 4 (upload this one):** building, link below when done.
 
-versionCode 3 is BURNED — the store rejected it with "A release with version
-code 3 already exists for this app", so a release row was created for vc3 even
-though no APK ever went live. A version code can never be reused, so every
-retry has to bump. Same code as vc3, higher number.
+versionCode 3 is BURNED. The store rejected that upload with "A release with
+version code 3 already exists for this app" — a release row was created for vc3
+even though no APK ever went live, and a version code can never be reused.
+
+Went to 1.0.2 rather than keeping 1.0.1, because the dead vc3 row is already
+filed under 1.0.1: reusing that name would leave two different 1.0.1 releases in
+the listing, one of them a shell. The version code is the real identity; the
+name is what a user reads. Cleaner to move both.
 `com.glianalabs.agent` · versionCode 3 · versionName 1.0.1 · same keystore
 (Build Credentials kSvbYdoSqO — the store only accepts an update signed with
 the original cert). Contains the MWA payment fix AND the tiles/model-count
@@ -60,7 +64,7 @@ Keystore backup: `npx eas-cli credentials -p android` → Download credentials.
 **dApp File:** the release APK (download from the expo.dev link above, upload the
 `.apk` as-is — it is already release-signed).
 
-**What's New (v1.0.1, versionCode 4 — upload this text):**
+**What's New (v1.0.2, versionCode 4 — upload this text):**
 
 > Wallet payments are fixed. Transactions signed with Phantom, Solflare or Seed
 > Vault now settle reliably — if payments failed for you before, this is the
