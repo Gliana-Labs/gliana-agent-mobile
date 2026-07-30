@@ -6,7 +6,7 @@ Paste-ready values for the publisher portal. Assets referenced are in `./media/`
 |---|---|
 | dApp Name | `Gliana Agent` |
 | Package Name | `com.glianalabs.agent` |
-| Subtitle (50) | `AI images, video, voice & music — pay per result` |
+| Subtitle (50) | `90+ AI models and tools — pay per result` |
 | dApp Icon 512×512 | `media/icon-512.png` |
 | Banner 1200×600 | `media/banner-1200x600.png` |
 | Previews (4) | `media/screenshot-1.png` … `screenshot-4.png` (1080×2400) |
@@ -22,21 +22,30 @@ Paste-ready values for the publisher portal. Assets referenced are in `./media/`
 
 ## Description
 
-> Gliana Agent picks the right AI model for what you describe, quotes the exact
-> price, and you approve it with one tap — paid in USDC from your Solana wallet
-> via Mobile Wallet Adapter. 70+ models across image, video, voice, music,
-> animate and transcribe. No signup, no API key, no subscription — you only pay
-> for what you generate.
+> Describe what you want. Gliana Agent picks the right model, quotes the exact
+> price before anything runs, and you approve it with one tap — paid in USDC
+> from your Solana wallet via Mobile Wallet Adapter.
+>
+> 90+ AI models across image, video, voice, music, animate and transcribe, plus
+> utility tools: turn a web page into structured data, summarise a YouTube
+> video, read a document, build social cards, check token and currency prices.
+>
+> No signup, no API key, no subscription, and no balance to top up — you pay per
+> result, and nothing is charged if a request is rejected.
 
 ## APK
 
-**CURRENT — v1.0.1 (upload this one):**
-https://expo.dev/artifacts/eas/A67MjdoJrtGNflfYISzk9oklAbJu1S3Wz1lwaPxYyY0.apk
-`com.glianalabs.agent` · versionCode 2 · versionName 1.0.1 · same keystore
-(cert SHA-256 e00765c6… matches v1.0.0 — store accepts it as an update).
-Contains the MWA payment fix; the listed v1.0.0 cannot settle payments.
+**CURRENT — v1.0.1 versionCode 3 (upload this one):**
+Build: https://expo.dev/accounts/glianalabs/projects/gliana-agent-mobile/builds/37a17203-2204-42b1-80ad-c151ecc7036e
+`com.glianalabs.agent` · versionCode 3 · versionName 1.0.1 · same keystore
+(Build Credentials kSvbYdoSqO — the store only accepts an update signed with
+the original cert). Contains the MWA payment fix AND the tiles/model-count
+change that landed after vc2 was built.
 
-v1.0.0 (superseded):
+vc2 (built, never uploaded — superseded by vc3):
+https://expo.dev/artifacts/eas/A67MjdoJrtGNflfYISzk9oklAbJu1S3Wz1lwaPxYyY0.apk
+
+v1.0.0 vc1 (currently LIVE on the store, cannot settle payments):
 https://expo.dev/artifacts/eas/N1xanlDLrFAbf3NEU6DnoGuYXvvg9feSPEGQ-gs27JU.apk
 
 Rebuild: `npx eas-cli build -p android --profile dapp-store`
@@ -47,7 +56,15 @@ Keystore backup: `npx eas-cli credentials -p android` → Download credentials.
 **dApp File:** the release APK (download from the expo.dev link above, upload the
 `.apk` as-is — it is already release-signed).
 
-**What's New (v1.0.1, versionCode 2):**
+**What's New (v1.0.1, versionCode 3 — upload this text):**
+
+> Wallet payments fixed — transactions signed with Phantom, Solflare or Seed
+> Vault now settle reliably. The agent can now also run utility tools, not just
+> generate: pull structured data out of a web page, summarise a video, read a
+> document, make social cards. Every setting shows its description and whether
+> it's required, and connection blips while switching apps explain themselves.
+
+**What's New (v1.0.1, versionCode 2 — built, never uploaded):**
 
 > Wallet payments fixed — transactions signed with Phantom, Solflare, or Seed
 > Vault now settle reliably. Also new: every model setting shows its
@@ -64,6 +81,7 @@ Keystore backup: `npx eas-cli credentials -p android` → Download credentials.
 
 ## Pre-submit checklist
 
-- [ ] One real MWA paid generation on a physical phone with this exact APK
+- [ ] One real MWA paid generation on a physical phone with the vc3 APK
+      (vc2 was the artifact proven end-to-end; vc3 is a rebuild and needs its own run)
 - [ ] Keystore backed up from EAS
 - [ ] Upload APK + assets, paste the values above
