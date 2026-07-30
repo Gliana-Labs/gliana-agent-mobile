@@ -15,7 +15,7 @@
     },
     "android": {
       "package": "com.glianalabs.agent",
-      "versionCode": 2,
+      "versionCode": 3,
       "userInterfaceStyle": "dark",
       "adaptiveIcon": {
         "backgroundColor": "#0b0b0e",
