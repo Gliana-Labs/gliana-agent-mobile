@@ -35,8 +35,12 @@ Paste-ready values for the publisher portal. Assets referenced are in `./media/`
 
 ## APK
 
-**CURRENT — v1.0.1 versionCode 3 (upload this one):**
-https://expo.dev/artifacts/eas/MGk9sE5jYPEHnlml2p943ArzLcnAqJybLDRIsP-2HgQ.apk
+**CURRENT — v1.0.1 versionCode 4 (upload this one):** building, link below when done.
+
+versionCode 3 is BURNED — the store rejected it with "A release with version
+code 3 already exists for this app", so a release row was created for vc3 even
+though no APK ever went live. A version code can never be reused, so every
+retry has to bump. Same code as vc3, higher number.
 `com.glianalabs.agent` · versionCode 3 · versionName 1.0.1 · same keystore
 (Build Credentials kSvbYdoSqO — the store only accepts an update signed with
 the original cert). Contains the MWA payment fix AND the tiles/model-count
@@ -56,7 +60,7 @@ Keystore backup: `npx eas-cli credentials -p android` → Download credentials.
 **dApp File:** the release APK (download from the expo.dev link above, upload the
 `.apk` as-is — it is already release-signed).
 
-**What's New (v1.0.1, versionCode 3 — upload this text):**
+**What's New (v1.0.1, versionCode 4 — upload this text):**
 
 > Wallet payments are fixed. Transactions signed with Phantom, Solflare or Seed
 > Vault now settle reliably — if payments failed for you before, this is the
