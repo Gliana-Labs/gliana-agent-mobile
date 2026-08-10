@@ -115,11 +115,12 @@ export function ProposalCard({
     // Plain `typeof === 'number'` dropped string/enum durations from the quote, so
     // picking a duration never moved the price (the bug). Mirror the web's parse.
     const durationNum = parseFloat(String(values.duration));
+    // Hand the whole form to quote(): it filters to BILLING_FIELDS, so a long
+    // prompt never reaches the URL, and a field the gateway starts pricing on
+    // (reference_videos, say) is forwarded without another edit here.
     const params = {
-      text: typeof values.text === 'string' ? values.text : undefined,
+      ...values,
       duration: Number.isFinite(durationNum) && durationNum > 0 ? durationNum : undefined,
-      resolution:
-        values.resolution !== undefined && values.resolution !== '' ? String(values.resolution) : undefined,
     };
     setPricing(true);
     const t = setTimeout(() => {

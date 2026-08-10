@@ -38,14 +38,35 @@ export interface Quote {
 
 // Tracks the same billing fields the gateway charges on (duration, text length,
 // resolution tier) so the shown number equals what /v1/infer takes.
+// Every field GET /v1/price reads to compute a charge. Kept as one list because
+// the gateway grew a second pricing dimension (seedance-2.5 bills 4.19x when the
+// input contains video/audio) and each client that hand-picked "duration, text,
+// resolution" silently quoted a quarter of the real price. Presence is what
+// matters for the reference fields, so the value need not be a real URL.
+const BILLING_FIELDS = [
+  'duration',
+  'text',
+  'resolution',
+  'music_length_ms',
+  'target',
+  'reference_videos',
+  'reference_audios',
+  'video',
+  'video_uri',
+  'audio',
+  'audio_url',
+] as const;
+
 export async function quote(
   model: string,
-  params?: { duration?: number; text?: string; resolution?: string },
+  params?: Record<string, unknown>,
 ): Promise<Quote> {
   const q = new URLSearchParams({ model });
-  if (params?.duration) q.set('duration', String(params.duration));
-  if (params?.text) q.set('text', params.text);
-  if (params?.resolution) q.set('resolution', params.resolution);
+  for (const k of BILLING_FIELDS) {
+    const v = params?.[k];
+    if (v === undefined || v === null || v === '') continue;
+    q.set(k, Array.isArray(v) ? String(v[0] ?? '1') : String(v));
+  }
   const res = await fetch(`${API}/v1/price?${q}`);
   if (!res.ok) throw new Error(`price: ${res.status}`);
   return (await res.json()) as Quote;
