@@ -186,9 +186,9 @@ export function MapBoard({
       </GestureDetector>
 
       {/* Chrome sits ABOVE the moving board, so the HUD stays put while the
-          world slides under it. */}
-      <View style={styles.scrimTop} pointerEvents="none" />
-      <View style={styles.scrimBottom} pointerEvents="none" />
+          world slides under it. No scrims: every piece of text here carries its
+          own hard shadow, and a dimmed band across the art is the HUD coming
+          back through the back door. */}
       {hud ? <View style={[styles.hud, { paddingTop: insets.top + space(2) }]}>{hud}</View> : null}
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </View>
@@ -197,8 +197,6 @@ export function MapBoard({
 
 const styles = StyleSheet.create({
   board: { flex: 1, backgroundColor: colors.ink, overflow: 'hidden' },
-  scrimTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 130, backgroundColor: 'rgba(10,10,13,0.45)' },
-  scrimBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 150, backgroundColor: 'rgba(10,10,13,0.35)' },
   hud: {
     position: 'absolute',
     left: 0,
@@ -230,7 +228,15 @@ const styles = StyleSheet.create({
     fontFamily: font.pixel,
     letterSpacing: 1,
     textShadowColor: '#000',
-    textShadowRadius: 4,
+    textShadowRadius: 6,
+    textShadowOffset: { width: 0, height: 1 },
   },
-  status: { color: colors.text, fontSize: 11, marginTop: 4, textShadowColor: '#000', textShadowRadius: 4 },
+  status: {
+    color: colors.text,
+    fontSize: 11,
+    marginTop: 4,
+    textShadowColor: '#000',
+    textShadowRadius: 6,
+    textShadowOffset: { width: 0, height: 1 },
+  },
 });

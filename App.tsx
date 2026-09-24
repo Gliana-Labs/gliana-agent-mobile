@@ -424,7 +424,7 @@ function Home({
         {
           id: 'studio',
           label: 'STUDIO',
-          x: 0.53,
+          x: 0.55,
           y: 0.44,
           w: 0.6,
           h: 0.11,
@@ -434,7 +434,7 @@ function Home({
         {
           id: 'showcase',
           label: 'SHOWCASE',
-          x: 0.45,
+          x: 0.5,
           // Lower than the roof line: the label hangs off the bottom of the hit
           // box, and at 0.70 that landed in the middle of the gallery's facade.
           y: 0.745,
