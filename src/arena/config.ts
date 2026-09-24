@@ -16,8 +16,16 @@ export const SKR_DECIMALS = 6;
 
 export const CLUSTER = (process.env.EXPO_PUBLIC_SOLANA_CLUSTER ?? 'devnet') as 'devnet' | 'mainnet';
 
+/**
+ * The Arena's RPC — its OWN variable, deliberately not EXPO_PUBLIC_SOLANA_RPC.
+ *
+ * That one is the payment path's mainnet RPC (lib/pay.ts fetches a blockhash
+ * from it to pay for generations). Pointing it at devnet so the Arena could run
+ * there would hand a devnet blockhash to a mainnet USDC transfer, which fails
+ * after the user has already approved it in their wallet.
+ */
 export const RPC_URL =
-  process.env.EXPO_PUBLIC_SOLANA_RPC ??
+  process.env.EXPO_PUBLIC_ARENA_RPC ??
   (CLUSTER === 'mainnet' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com');
 
 export const SKR_MINT: Address = address(

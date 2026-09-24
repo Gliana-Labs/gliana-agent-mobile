@@ -244,7 +244,12 @@ function Main() {
           ) : (
             <View style={styles.statusPill}>
               <View style={styles.statusDot} />
-              <Text style={styles.statusText}>Agent online · pay per result</Text>
+              {/* Short, and allowed to shrink: with the Arena pill and Connect both in
+                  the header, the old "Agent online · pay per result" ran under the
+                  Connect button on a phone-width screen. */}
+              <Text style={styles.statusText} numberOfLines={1}>
+                Online
+              </Text>
             </View>
           )}
         </View>
@@ -350,7 +355,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(245,158,11,0.3)',
   },
   arenaText: { color: colors.flameSoft, fontSize: 12, fontWeight: '700' },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: space(1.5) },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), flexShrink: 1 },
   statusDot: { width: 6, height: 6, borderRadius: 6, backgroundColor: colors.green },
   statusText: { color: colors.textFaint, fontSize: 12 },
   list: { padding: space(4), paddingBottom: space(6) },
