@@ -65,7 +65,8 @@
         {
           "photosPermission": "Allow Gliana Agent to attach an image for image-to-video models."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

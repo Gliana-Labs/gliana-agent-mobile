@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
 import Svg, { Path } from 'react-native-svg';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,6 +59,11 @@ const CAT_ICON: Record<string, string> = {
 };
 
 export default function App() {
+  // The arcade face for the Arena. Loaded, not awaited: the chat must not wait
+  // on a font it does not use, and the Arena falls back to the system font for
+  // the frame or two before it lands.
+  useFonts({ PressStart2P_400Regular });
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

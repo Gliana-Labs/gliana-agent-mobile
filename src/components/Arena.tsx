@@ -33,11 +33,11 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWallet } from '../lib/mwa';
-import { colors, radius, space } from '../theme';
+import { colors, font, radius, space } from '../theme';
 import { useArena, HOLDER_THRESHOLD, type Placing } from '../arena/useArena';
 import { shortAddress, type EntryWithAddress } from '../arena/client';
 import { CLUSTER, skr } from '../arena/config';
-import { Chip, Pot, Press, Rank, ThemeCard, WinBanner, tapSelect } from './arena/bits';
+import { Chip, Pot, Press, Rank, ThemeCard, WinBanner, tapSelect, PIXEL, px } from './arena/bits';
 import type { GenerationResult } from '../types';
 
 type Tab = 'today' | 'gallery' | 'you';
@@ -382,7 +382,9 @@ function EntryCard({
             <Text style={[styles.value, styles.tnum]}>
               {entry.data.votes} {entry.data.votes === 1 ? 'vote' : 'votes'}
             </Text>
-            <Text style={styles.meta}>{mine ? 'yours' : shortAddress(entry.data.entrant)}</Text>
+            <Text style={styles.meta} numberOfLines={1}>
+              {mine ? 'yours' : shortAddress(entry.data.entrant)}
+            </Text>
           </View>
         </View>
         {canVote ? (
@@ -565,19 +567,19 @@ const styles = StyleSheet.create({
     paddingVertical: space(3),
   },
   // The modal title is navigation, not content — it must not compete with the theme.
-  navTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  navTitle: { color: colors.text, fontSize: 13, fontFamily: font.pixel },
   close: { paddingHorizontal: space(3), paddingVertical: space(2) },
-  closeText: { color: colors.textDim, fontSize: 15, fontWeight: '600' },
+  closeText: { color: colors.textDim, fontSize: 9, fontFamily: font.pixel },
 
   // Type tiers.
-  display: { color: colors.text, fontSize: 40, fontWeight: '800', letterSpacing: -1 },
-  title: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  display: { color: colors.text, fontSize: 34, fontFamily: font.pixel },
+  title: { color: colors.text, fontSize: 12, fontFamily: font.pixel, lineHeight: 19 },
   body: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
-  label: { color: colors.textDim, fontSize: 11, fontWeight: '600', letterSpacing: 0.8 },
-  value: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  label: { color: colors.textDim, fontSize: 8, fontFamily: font.pixel, letterSpacing: 1 },
+  value: { color: colors.text, fontSize: 11, fontFamily: font.pixel },
   meta: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   tnum: { fontVariant: ['tabular-nums'] },
-  link: { color: colors.flameSoft, fontSize: 13, fontWeight: '600' },
+  link: { color: colors.flameSoft, fontSize: 9, fontFamily: font.pixel, lineHeight: 16 },
   linkRow: { alignSelf: 'flex-start', paddingVertical: space(2) },
   hair: { borderTopWidth: 1, borderTopColor: colors.borderFaint, paddingTop: space(2) },
 
@@ -588,34 +590,36 @@ const styles = StyleSheet.create({
     marginHorizontal: space(4),
     marginBottom: space(3),
     backgroundColor: colors.surface,
-    borderRadius: radius.pill,
+    borderRadius: px.radius,
+    borderWidth: px.border,
+    borderColor: colors.border,
   },
-  tab: { flex: 1, paddingVertical: space(2), borderRadius: radius.pill, alignItems: 'center' },
+  tab: { flex: 1, paddingVertical: space(2.5), borderRadius: 2, alignItems: 'center' },
   tabOn: { backgroundColor: colors.surfaceStrong },
-  tabText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
-  tabTextOn: { color: colors.text, fontWeight: '700' },
+  tabText: { color: colors.textDim, fontSize: 9, fontFamily: font.pixel },
+  tabTextOn: { color: colors.text },
 
   list: { padding: space(3), paddingBottom: space(10) },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chipRow: { flexDirection: 'row', gap: space(2), marginTop: space(1) },
   ends: { marginLeft: 'auto', alignItems: 'flex-end' },
-  endsValue: { color: colors.text, fontSize: 20, fontWeight: '700', marginTop: 2 },
+  endsValue: { color: colors.text, fontSize: 15, fontFamily: font.pixel, marginTop: space(2) },
 
   // One card spec: 16 radius, 16 padding, surface, hairline border.
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
+    borderRadius: px.radius,
+    borderWidth: px.border,
     borderColor: colors.border,
     padding: space(4),
     marginBottom: space(4),
     gap: space(2),
   },
   // Nested media: parent radius (16) − padding (16), floored at 8.
-  myImage: { width: '100%', aspectRatio: 1, borderRadius: 8, marginTop: space(1) },
+  myImage: { width: '100%', aspectRatio: 1, borderRadius: 2, marginTop: space(1) },
 
-  pick: { width: 84, height: 84, borderRadius: 8, borderWidth: 2, borderColor: 'transparent' },
+  pick: { width: 84, height: 84, borderRadius: 2, borderWidth: px.border, borderColor: colors.border },
   pickOn: { borderColor: colors.flame },
 
   yesterday: {
@@ -624,39 +628,47 @@ const styles = StyleSheet.create({
     gap: space(3),
     padding: space(3),
     marginBottom: space(4),
-    borderRadius: radius.lg,
+    borderRadius: px.radius,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderFaint,
+    borderWidth: px.border,
+    borderColor: colors.border,
   },
-  thumb: { width: 44, height: 44, borderRadius: 8 },
+  thumb: { width: 44, height: 44, borderRadius: 2 },
   thumbFail: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceStrong },
 
   splitWrap: { gap: space(2), paddingHorizontal: space(1), marginTop: space(1) },
-  splitBar: { flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', gap: 2 },
-  splitPart: { height: 6 },
+  splitBar: { flexDirection: 'row', height: 10, overflow: 'hidden', gap: 3 },
+  splitPart: { height: 10 },
 
   action: {
     backgroundColor: colors.flame,
-    borderRadius: radius.pill,
+    borderRadius: px.radius,
+    // The hard offset is the depth: an 8-bit frame buffer has no blur.
+    borderBottomWidth: px.offset,
+    borderBottomColor: colors.flameDeep,
     paddingVertical: space(3),
     alignItems: 'center',
     marginTop: space(2),
     minHeight: 48,
     justifyContent: 'center',
   },
-  actionGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
-  actionText: { color: colors.ink, fontWeight: '700', fontSize: 15 },
+  actionGhost: {
+    backgroundColor: 'transparent',
+    borderWidth: px.border,
+    borderColor: colors.border,
+    borderBottomColor: colors.border,
+  },
+  actionText: { color: colors.ink, fontSize: 11, fontFamily: font.pixel, letterSpacing: 0.5 },
 
   entry: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: px.radius,
     overflow: 'hidden',
     marginBottom: space(3),
-    borderWidth: 1,
-    borderColor: colors.borderFaint,
+    borderWidth: px.border,
+    borderColor: colors.border,
   },
-  entryMine: { borderColor: 'rgba(245,158,11,0.45)' },
+  entryMine: { borderColor: colors.flame },
   entryFoot: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -664,17 +676,19 @@ const styles = StyleSheet.create({
     padding: space(3),
     gap: space(2),
   },
-  entryMeta: { flexDirection: 'row', alignItems: 'center', gap: space(2), flexShrink: 1 },
+  entryMeta: { flexDirection: 'row', alignItems: 'center', gap: space(2), flex: 1, minWidth: 0 },
   // 44 is the floor for the most-repeated action in the product.
   voteBtn: {
     backgroundColor: colors.flame,
-    borderRadius: radius.pill,
+    borderRadius: px.radius,
+    borderBottomWidth: px.offset,
+    borderBottomColor: colors.flameDeep,
     paddingHorizontal: space(4),
     paddingVertical: space(3),
     minHeight: 44,
     justifyContent: 'center',
   },
-  voteText: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+  voteText: { color: colors.ink, fontSize: 9, fontFamily: font.pixel },
 
   claimRow: {
     flexDirection: 'row',
@@ -685,7 +699,8 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderFaint,
   },
 
-  track: { height: 6, borderRadius: 3, backgroundColor: colors.surfaceStrong, overflow: 'hidden' },
+  // A segmented meter, because a smooth bar is not a pixel idiom.
+  track: { height: 10, borderRadius: 2, backgroundColor: colors.surfaceStrong, borderWidth: px.border, borderColor: colors.border, overflow: 'hidden' },
   fill: { height: 6, backgroundColor: colors.flame },
 
   error: {

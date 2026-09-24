@@ -27,7 +27,21 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, radius, space } from '../../theme';
+import { colors, font, radius, space } from '../../theme';
+
+/**
+ * ARCADE STYLING, in three rules.
+ *
+ * 1. Pixel type is CHROME ONLY — labels, numbers, buttons, titles. Body copy
+ *    stays in the system font; a paragraph of Press Start 2P is unreadable and
+ *    that is how pixel styling usually ruins an app.
+ * 2. Corners are square-ish (4px) and borders are 2px. Rounded pills read as
+ *    iOS; hard edges read as a cabinet.
+ * 3. Depth is a hard offset block, never a blur. Shadows do not exist in an
+ *    8-bit frame buffer, and Android elevation animates badly anyway.
+ */
+export const PIXEL = { fontFamily: font.pixel } as const;
+export const px = { radius: 4, border: 2, offset: 3 } as const;
 
 /** Strong ease-out. Reanimated's built-ins are as weak as CSS's. */
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -121,10 +135,28 @@ export function ThemeCard({ theme, children }: { theme: string; children: React.
       end={{ x: 1, y: 1 }}
       style={styles.theme}
     >
+      <Scanlines />
       <Text style={styles.themeLabel}>TODAY'S THEME</Text>
       <Text style={styles.themeText}>{theme}</Text>
       <View style={styles.themeRow}>{children}</View>
     </LinearGradient>
+  );
+}
+
+/**
+ * CRT scanlines — a stack of 2px-pitch hairlines at 4% white.
+ *
+ * Drawn as views rather than an image so it costs nothing to ship and scales to
+ * any card height. Kept faint: over a photo it would be texture on texture, and
+ * this only ever sits on the flat theme card.
+ */
+function Scanlines() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {Array.from({ length: 40 }).map((_, i) => (
+        <View key={i} style={styles.scanline} />
+      ))}
+    </View>
   );
 }
 
@@ -191,38 +223,37 @@ export function WinBanner({ place, children }: { place: number; children: React.
 }
 
 const styles = StyleSheet.create({
-  potLabel: { color: colors.textDim, fontSize: 11, fontWeight: '600', letterSpacing: 0.8 },
-  potRow: { flexDirection: 'row', alignItems: 'baseline', gap: space(1) },
-  potValue: { color: colors.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
-  potUnit: { color: colors.flameSoft, fontSize: 13, fontWeight: '700' },
+  potLabel: { color: colors.textDim, fontSize: 8, fontFamily: font.pixel, letterSpacing: 1 },
+  potRow: { flexDirection: 'row', alignItems: 'baseline', gap: space(2), marginTop: space(2) },
+  potValue: { color: colors.text, fontSize: 26, fontFamily: font.pixel },
+  potUnit: { color: colors.flameSoft, fontSize: 11, fontFamily: font.pixel },
 
   theme: {
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.25)',
+    borderRadius: px.radius,
+    borderWidth: px.border,
+    borderColor: 'rgba(245,158,11,0.45)',
     padding: space(5),
-    marginBottom: space(3),
     overflow: 'hidden',
   },
-  themeLabel: { color: colors.flameSoft, fontSize: 10, letterSpacing: 1.4, fontWeight: '800' },
-  themeText: { color: colors.text, fontSize: 26, fontWeight: '800', marginTop: space(2), letterSpacing: -0.4 },
+  themeLabel: { color: colors.flameSoft, fontSize: 8, letterSpacing: 1.6, fontFamily: font.pixel },
+  themeText: { color: colors.text, fontSize: 20, fontFamily: font.pixel, marginTop: space(3), lineHeight: 30 },
   themeRow: { flexDirection: 'row', gap: space(7), marginTop: space(5), alignItems: 'flex-end' },
 
   rank: {
-    borderWidth: 1.5,
-    borderRadius: radius.pill,
+    borderWidth: px.border,
+    borderRadius: px.radius,
     paddingHorizontal: space(2),
-    paddingVertical: 1,
+    paddingVertical: space(1),
   },
-  rankText: { fontSize: 11, fontWeight: '800' },
+  rankText: { fontSize: 9, fontFamily: font.pixel },
 
-  chip: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: space(2.5), paddingVertical: space(1) },
-  chipText: { fontSize: 11, fontWeight: '700' },
+  chip: { borderWidth: px.border, borderRadius: px.radius, paddingHorizontal: space(2.5), paddingVertical: space(1.5) },
+  chipText: { fontSize: 8, fontFamily: font.pixel, letterSpacing: 0.5 },
 
   win: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.45)',
+    borderRadius: px.radius,
+    borderWidth: px.border,
+    borderColor: colors.flame,
     backgroundColor: 'rgba(245,158,11,0.10)',
     padding: space(4),
     marginBottom: space(3),
@@ -230,5 +261,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   winGlow: { backgroundColor: 'rgba(245,158,11,0.18)' },
-  winTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
+  scanline: { height: 1, marginBottom: 2, backgroundColor: 'rgba(255,255,255,0.035)' },
+  winTitle: { color: colors.text, fontSize: 13, fontFamily: font.pixel, lineHeight: 20 },
 });
