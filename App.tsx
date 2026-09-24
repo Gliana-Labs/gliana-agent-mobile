@@ -23,6 +23,7 @@ import { MessageBubble } from './src/components/MessageBubble';
 import { Sidebar } from './src/components/Sidebar';
 import { Showcase } from './src/components/Showcase';
 import { Arena } from './src/components/Arena';
+import { MapBoard } from './src/components/MapBoard';
 import { usePeek, timeLeft, type Peek } from './src/arena/usePeek';
 import { ConnectWallet } from './src/components/ConnectWallet';
 import { MenuIcon } from './src/components/icons';
@@ -303,6 +304,7 @@ function Main() {
             onPick={send}
             peek={peek}
             onArena={() => setArenaOpen(true)}
+            onShowcase={() => setShowcaseOpen(true)}
             conversations={conversations}
             onOpenChat={(id) => {
               setActiveId(id);
@@ -374,6 +376,7 @@ function Home({
   onPick,
   peek,
   onArena,
+  onShowcase,
   conversations,
   onOpenChat,
   onNewChat,
@@ -381,12 +384,14 @@ function Home({
   onPick: (text: string) => void;
   peek: Peek;
   onArena: () => void;
+  onShowcase: () => void;
   conversations: Conversation[];
   onOpenChat: (id: string) => void;
   onNewChat: () => void;
 }) {
   const left = timeLeft(peek.endsAt);
-  const recent = conversations.slice(0, 3);
+  // An empty "New chat" is not somewhere to pick up from.
+  const recent = conversations.filter((c) => c.messages.length > 0).slice(0, 3);
 
   return (
     <ScrollView contentContainerStyle={styles.home} keyboardShouldPersistTaps="handled">
@@ -397,25 +402,42 @@ function Home({
         Describe it and the agent picks the model, quotes the exact price, and you pay per result.
       </Text>
 
-      <Pressable style={styles.arenaCard} onPress={onArena}>
-        <View style={styles.arenaCardHead}>
-          <Text style={styles.arenaCardLabel}>◈  TODAY'S ARENA</Text>
-          {left ? <Text style={styles.arenaCardClock}>{left}</Text> : null}
-        </View>
-        <Text style={styles.arenaCardTheme} numberOfLines={2}>
-          {peek.theme}
-        </Text>
-        <Text style={styles.arenaCardMeta}>
-          {peek.open
-            ? `${peek.entries} ${peek.entries === 1 ? 'entry' : 'entries'} · enter yours with SKR`
-            : 'No round open yet — open it and set the pace'}
-        </Text>
-      </Pressable>
+      <MapBoard
+        nodes={[
+          {
+            id: 'studio',
+            label: 'STUDIO',
+            glyph: '✦',
+            x: 0.17,
+            y: 0.68,
+            status: '100+ models',
+            onPress: onNewChat,
+          },
+          {
+            id: 'arena',
+            label: 'ARENA',
+            glyph: '◈',
+            x: 0.5,
+            y: 0.3,
+            live: peek.open,
+            status: peek.open ? `${left ?? 'closing'} · ${peek.entries} in` : 'no round yet',
+            onPress: onArena,
+          },
+          {
+            id: 'gallery',
+            label: 'SHOWCASE',
+            glyph: '▦',
+            x: 0.83,
+            y: 0.68,
+            status: 'what others made',
+            onPress: onShowcase,
+          },
+        ]}
+      />
 
-      <Pressable style={styles.makeCard} onPress={onNewChat}>
-        <Text style={styles.makeTitle}>✦  Make something</Text>
-        <Text style={styles.arenaCardMeta}>Image, video, music, voice — 100+ models, one prompt</Text>
-      </Pressable>
+      <Text style={styles.theme} numberOfLines={2}>
+        Today: {peek.theme}
+      </Text>
 
       {recent.length > 0 ? (
         <>
@@ -577,6 +599,7 @@ const styles = StyleSheet.create({
   recentText: { color: colors.textDim, fontSize: 14 },
   backIcon: { color: colors.textDim, fontSize: 30, lineHeight: 30, marginTop: -4 },
   wordmark: { color: colors.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
+  theme: { color: colors.textDim, fontSize: 13, textAlign: 'center', marginBottom: space(2) },
   sectionLabel: {
     alignSelf: 'flex-start',
     color: colors.textDim,
