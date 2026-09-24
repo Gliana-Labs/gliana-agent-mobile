@@ -12,6 +12,14 @@
  * Only the Arena node carries live state — a lit ring, a green dot, the
  * countdown — because it is the only place with a deadline.
  *
+ * Travel is a TAP GESTURE racing the pan, not a Pressable per building.
+ *
+ * Pressables nested inside a panning, transformed view are fragile: the pan
+ * claims the touch, and any finger that drifts a few pixels cancels the press.
+ * Both failures look identical to the user — the building does nothing. One tap
+ * gesture on the board, hit-testing the buildings itself in board coordinates,
+ * has neither problem and gives every node the same generous 24px slop.
+ *
  * The board is BIGGER than the screen and you drag it around. A map you cannot
  * move is a picture; the whole point of an overworld is that there is more of
  * it than you can see. Panning runs on the UI thread through a shared value, so
@@ -21,9 +29,9 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { colors, font, space } from '../theme';
-import { Press } from './arena/bits';
 
 export interface MapNode {
   id: string;
@@ -72,13 +80,35 @@ export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.R
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
 
+  const hit = (px: number, py: number) => {
+    // Last first: later nodes draw on top, so they should win an overlap.
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const b = box(nodes[i]);
+      if (px >= b.left && px <= b.left + b.width && py >= b.top && py <= b.top + b.height) return nodes[i];
+    }
+    return null;
+  };
+
+  // runOnJS because the handler calls straight into navigation — there is
+  // nothing to animate here, and hopping threads for a tap is wasted ceremony.
+  const tap = Gesture.Tap()
+    .runOnJS(true)
+    .maxDuration(500)
+    .maxDistance(24)
+    .onEnd((e) => {
+      const node = hit(e.x, e.y);
+      if (!node) return;
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      node.onPress();
+    });
+
   const pan = Gesture.Pan()
     // Without a movement threshold the pan claims every touch the moment it
     // lands, so the buildings stopped being tappable the day the map started
     // moving. 8px is enough to tell a drag from a tap and small enough that a
     // drag still feels immediate.
-    .activeOffsetX([-8, 8])
-    .activeOffsetY([-8, 8])
+    .activeOffsetX([-12, 12])
+    .activeOffsetY([-12, 12])
     .onBegin(() => {
       startX.set(x.get());
       startY.set(y.get());
@@ -110,14 +140,15 @@ export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.R
 
   return (
     <View style={styles.board}>
-      <GestureDetector gesture={pan}>
+      <GestureDetector gesture={Gesture.Race(pan, tap)}>
         <Animated.View style={[{ width: boardWidth, height: boardHeight, left: -(boardWidth - width) / 2 }, board]}>
           <Image source={require('../../assets/map-board.png')} style={StyleSheet.absoluteFill} contentFit="cover" />
 
           {nodes.map((n) => (
-            <Press key={n.id} onPress={n.onPress} haptic="none" style={[styles.node, box(n), n.live && styles.nodeLive]}>
+            // Visual only: the tap gesture above owns activation.
+            <View key={n.id} style={[styles.node, box(n), n.live && styles.nodeLive]} pointerEvents="none">
               {n.live ? <View style={styles.dot} /> : null}
-            </Press>
+            </View>
           ))}
 
           {nodes.map((n) => {
