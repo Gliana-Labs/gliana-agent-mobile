@@ -218,7 +218,12 @@ function Main() {
         }}
       />
 
-      <Arena visible={arenaOpen} onClose={() => setArenaOpen(false)} results={finishedResults} />
+      <Arena
+        visible={arenaOpen}
+        onClose={() => setArenaOpen(false)}
+        results={finishedResults}
+        onMake={(prompt) => void send(prompt)}
+      />
 
       <Showcase
         visible={showcaseOpen}

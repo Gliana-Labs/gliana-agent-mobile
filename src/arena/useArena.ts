@@ -50,6 +50,17 @@ export interface History {
   placings: Placing[];
 }
 
+/** Yesterday's round, as a one-line result. Null when there wasn't one. */
+export interface Yesterday {
+  roundId: bigint;
+  theme: string;
+  winner: string | null;
+  winnerVotes: number;
+  mediaUri: string | null;
+  /** Your placing in it, if you had one. */
+  mine: Placing | null;
+}
+
 export interface ArenaState {
   roundId: bigint;
   theme: string;
@@ -66,6 +77,7 @@ export interface ArenaState {
   pot: bigint;
   endsAt: number | null;
   history: History;
+  yesterday: Yesterday | null;
   loading: boolean;
   busy: boolean;
   error: string | null;
@@ -87,6 +99,7 @@ export function useArena(signer: WireSigner | null): ArenaState {
   const [voted, setVoted] = useState(false);
   const [held, setHeld] = useState(0n);
   const [history, setHistory] = useState<History>({ streak: 0, entered: 0, wins: 0, placings: [] });
+  const [yesterday, setYesterday] = useState<Yesterday | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +115,7 @@ export function useArena(signer: WireSigner | null): ArenaState {
       setRound(r);
       setEntries(e);
       setError(null);
+      void loadYesterday(roundId).then((y) => alive.current && setYesterday(y));
       if (signer) {
         const me = address(signer.address);
         const [v, balance, past] = await Promise.all([hasVoted(addr, me), skrBalance(me), fetchHistory(me)]);
@@ -169,10 +183,37 @@ export function useArena(signer: WireSigner | null): ArenaState {
     error,
     refresh,
     history,
+    yesterday: yesterday
+      ? { ...yesterday, mine: history.placings.find((p) => p.roundId === yesterday.roundId) ?? null }
+      : null,
     claim: (p: Placing) => act((s) => claimPlace(s, p.roundId, p.entry, address(s.address), p.place)),
     open: () => act((s) => openRound(s, roundId)),
     enter: (mediaUri: string) => act((s) => enterRound(s, roundId, mediaUri)),
     vote: (entry: Address) => act((s) => voteFor(s, roundId, entry)),
+  };
+}
+
+/**
+ * Yesterday's winner, read from that round's own leaderboard.
+ *
+ * The round account already ranks its top five (the program keeps it updated on
+ * every vote), so this is two reads, not a tally over every entry.
+ */
+async function loadYesterday(today: bigint): Promise<Yesterday | null> {
+  const roundId = today - 1n;
+  const round = await fetchRound(roundId);
+  if (!round) return null;
+  const [addr] = await roundAddress(roundId);
+  const entries = await fetchEntries(addr);
+  const top = round.top[0];
+  const winner = entries.find((e) => e.address === top) ?? null;
+  return {
+    roundId,
+    theme: round.theme,
+    winner: winner?.data.entrant ?? null,
+    winnerVotes: winner?.data.votes ?? 0,
+    mediaUri: winner?.data.mediaUri ?? null,
+    mine: null,
   };
 }
 

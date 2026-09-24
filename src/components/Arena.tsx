@@ -1,14 +1,24 @@
 /**
  * The Arena — a daily contest played with SKR.
  *
- * Three views behind one modal: Today (the theme, the pot, your entry), Gallery
- * (everyone's entries, one vote per wallet) and You (SKR, perks, history).
+ * Three views behind one modal: Today (yesterday's result, the theme, the pot,
+ * your entry), Gallery (everyone's entries, one vote per wallet) and You (the
+ * streak, perks, history).
  *
  * The generation itself is NOT here: you make something in the chat, paid for
  * in USDC exactly as before, and then choose to enter it. Entering after the
  * fact is the point — a model that fails never costs an entry fee.
+ *
+ * DESIGN RULES, so later edits do not drift:
+ *  - Filled amber means an action that costs or wins money: Enter, Vote, Claim.
+ *    Selection is surface, not colour; exits are textDim. Amber TEXT marks money.
+ *  - Type is four tiers — display 40/800, title 17/700, value 15/600, body 13 —
+ *    with hierarchy from weight and colour, never from another font size.
+ *  - Nothing below 12px and nothing dimmer than textDim: textFaint measures
+ *    4.1:1 on this background and textGhost 2.5:1, which is decoration, not text.
+ *  - Numbers that change under the eye are tabular.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -24,9 +34,10 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWallet } from '../lib/mwa';
 import { colors, radius, space } from '../theme';
-import { useArena, HOLDER_THRESHOLD } from '../arena/useArena';
+import { useArena, HOLDER_THRESHOLD, type Placing } from '../arena/useArena';
 import { shortAddress, type EntryWithAddress } from '../arena/client';
 import { CLUSTER, skr } from '../arena/config';
+import { Chip, Pot, Press, Rank, ThemeCard, WinBanner, tapSelect } from './arena/bits';
 import type { GenerationResult } from '../types';
 
 type Tab = 'today' | 'gallery' | 'you';
@@ -35,11 +46,14 @@ export function Arena({
   visible,
   onClose,
   results,
+  onMake,
 }: {
   visible: boolean;
   onClose: () => void;
   /** Finished generations from this device's chats — what you can enter. */
   results: GenerationResult[];
+  /** Seed the chat composer — how a player with nothing to enter gets started. */
+  onMake: (prompt: string) => void;
 }) {
   const insets = useSafeAreaInsets();
   const { account, signer, connect, connecting } = useWallet();
@@ -54,21 +68,28 @@ export function Arena({
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>Arena</Text>
-            <Text style={styles.sub}>
-              {CLUSTER === 'devnet' ? 'Devnet · test SKR' : 'Daily contest · SKR'}
-            </Text>
+            <Text style={styles.navTitle}>Arena</Text>
+            <Text style={styles.meta}>{CLUSTER === 'devnet' ? 'Devnet · test SKR' : 'Daily contest'}</Text>
           </View>
           <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
             <Text style={styles.closeText}>Done</Text>
           </Pressable>
         </View>
 
+        {/* Selection is surface, not colour — amber is reserved for money. */}
         <View style={styles.tabs}>
           {(['today', 'gallery', 'you'] as Tab[]).map((t) => (
-            <Pressable key={t} onPress={() => setTab(t)} style={[styles.tab, tab === t && styles.tabOn]}>
+            <Pressable
+              key={t}
+              onPress={() => {
+                void tapSelect();
+                setTab(t);
+              }}
+              style={[styles.tab, tab === t && styles.tabOn]}
+            >
               <Text style={[styles.tabText, tab === t && styles.tabTextOn]}>
-                {t === 'today' ? 'Today' : t === 'gallery' ? `Gallery${arena.entries.length ? ` · ${arena.entries.length}` : ''}` : 'You'}
+                {t === 'today' ? 'Today' : t === 'gallery' ? 'Gallery' : 'You'}
+                {t === 'gallery' && arena.entries.length > 0 ? `  ${arena.entries.length}` : ''}
               </Text>
             </Pressable>
           ))}
@@ -77,16 +98,26 @@ export function Arena({
         {arena.error ? (
           <Pressable onPress={() => void arena.refresh()} style={styles.error}>
             <Text style={styles.errorText}>{arena.error}</Text>
-            <Text style={styles.errorHint}>Tap to retry</Text>
+            <Text style={styles.meta}>Tap to retry</Text>
           </Pressable>
         ) : null}
 
         {tab === 'today' ? (
-          <Today arena={arena} results={results} connected={connected} onConnect={connect} connecting={connecting} />
+          <Today
+            arena={arena}
+            results={results}
+            connected={connected}
+            onConnect={connect}
+            connecting={connecting}
+            onMake={(p) => {
+              onClose();
+              onMake(p);
+            }}
+          />
         ) : tab === 'gallery' ? (
           <Gallery arena={arena} me={account?.address ?? null} />
         ) : (
-          <You arena={arena} address={account?.address ?? null} />
+          <You arena={arena} address={account?.address ?? null} onGoToday={() => setTab('today')} />
         )}
       </View>
     </Modal>
@@ -101,16 +132,18 @@ function Today({
   connected,
   onConnect,
   connecting,
+  onMake,
 }: {
   arena: ReturnType<typeof useArena>;
   results: GenerationResult[];
   connected: boolean;
   onConnect: () => Promise<void>;
   connecting: boolean;
+  onMake: (prompt: string) => void;
 }) {
   const left = useCountdown(arena.endsAt);
-  // Only images can be entered: the gallery is a grid people scroll and judge
-  // in a second, and a video nobody plays is an entry nobody votes for.
+  // Only images can be entered: the gallery is judged in a second, and a video
+  // nobody plays is an entry nobody votes for.
   const enterable = useMemo(
     () => results.filter((r) => Boolean(r.url) && (r.contentType ?? '').startsWith('image/')).slice(0, 12),
     [results],
@@ -119,96 +152,147 @@ function Today({
 
   if (arena.loading) return <Loading />;
 
+  const urgent = arena.endsAt !== null && arena.endsAt * 1000 - Date.now() < 3_600_000;
+
   return (
-    <FlatList
-      data={[]}
-      renderItem={null}
-      contentContainerStyle={styles.body}
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => void arena.refresh()} tintColor={colors.flame} />}
-      ListHeaderComponent={
-        <View>
-          <View style={styles.themeCard}>
-            <Text style={styles.themeLabel}>TODAY'S THEME</Text>
-            <Text style={styles.theme}>{arena.theme}</Text>
-            <View style={styles.themeRow}>
-              <Stat label="Pot" value={`${skr(arena.pot)} SKR`} />
-              <Stat label="Entries" value={String(arena.entries.length)} />
-              <Stat label="Ends in" value={left} />
-            </View>
-          </View>
+    <Scroll onRefresh={arena.refresh}>
+      <Result arena={arena} />
 
-          {!arena.roundOpen ? (
-            <Card>
-              <Text style={styles.cardTitle}>Nobody has opened today's round</Text>
-              <Text style={styles.cardBody}>
-                Rounds are opened by whoever gets there first — there is no server. Opening costs a
-                fraction of a cent in rent and gives you no advantage in the round.
-              </Text>
-              <Action
-                label="Open today's round"
-                busy={arena.busy}
-                disabled={!connected}
-                onPress={() => void arena.open()}
-              />
-              {!connected ? <Connect onConnect={onConnect} connecting={connecting} /> : null}
-            </Card>
-          ) : arena.mine ? (
-            <Card>
-              <Text style={styles.cardTitle}>You're in</Text>
-              <Image source={{ uri: arena.mine.data.mediaUri }} style={styles.myImage} contentFit="cover" />
-              <Text style={styles.cardBody}>
-                {arena.mine.data.votes} {arena.mine.data.votes === 1 ? 'vote' : 'votes'} · paid{' '}
-                {skr(arena.mine.data.paidFee)} SKR
-              </Text>
-            </Card>
-          ) : (
-            <Card>
-              <Text style={styles.cardTitle}>Enter today's round</Text>
-              <Text style={styles.cardBody}>
-                Make something in the chat first — you pay for the generation as normal. Then pick it
-                here and pay {skr(arena.fee)} SKR to enter.
-                {arena.isHolder ? ' Holder price — 20% off.' : ''}
-              </Text>
-
-              {enterable.length === 0 ? (
-                <Text style={styles.empty}>No images yet. Make one in the chat and come back.</Text>
-              ) : (
-                <FlatList
-                  horizontal
-                  data={enterable}
-                  keyExtractor={(r) => r.url!}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: space(2), paddingVertical: space(2) }}
-                  renderItem={({ item }) => (
-                    <Pressable onPress={() => setPicked(item.url!)}>
-                      <Image
-                        source={{ uri: item.url! }}
-                        style={[styles.pick, picked === item.url! && styles.pickOn]}
-                        contentFit="cover"
-                      />
-                    </Pressable>
-                  )}
-                />
-              )}
-
-              <Action
-                label={picked ? `Enter for ${skr(arena.fee)} SKR` : 'Pick an image'}
-                busy={arena.busy}
-                disabled={!connected || !picked}
-                onPress={() => picked && void arena.enter(picked)}
-              />
-              {!connected ? <Connect onConnect={onConnect} connecting={connecting} /> : null}
-            </Card>
-          )}
-
-          <Text style={styles.fine}>
-            Winner takes 60% of the pot, places 2–5 share 25%, and the wallets that voted for the
-            winner early share 15%. Payouts are permissionless once the round ends — anyone can push
-            them through, including you.
-          </Text>
+      <ThemeCard theme={arena.theme}>
+        <Pot amount={skr(arena.pot)} />
+        <View style={styles.ends}>
+          <Text style={styles.label}>ENDS IN</Text>
+          <Text style={[styles.endsValue, styles.tnum, urgent && { color: colors.flame }]}>{left}</Text>
         </View>
-      }
-    />
+      </ThemeCard>
+
+      {!arena.roundOpen ? (
+        <Card>
+          <Text style={styles.title}>Nobody has opened today's round</Text>
+          <Text style={styles.body}>
+            Rounds are opened by whoever gets there first — there is no server. It costs a fraction
+            of a cent in rent and gives you no advantage.
+          </Text>
+          <Action label="Open today's round" busy={arena.busy} disabled={!connected} onPress={() => void arena.open()} />
+          {!connected ? <Connect onConnect={onConnect} connecting={connecting} /> : null}
+        </Card>
+      ) : arena.mine ? (
+        <Card>
+          <View style={styles.rowBetween}>
+            <Text style={styles.title}>You're in</Text>
+            <Chip text={`${arena.mine.data.votes} ${arena.mine.data.votes === 1 ? 'vote' : 'votes'}`} />
+          </View>
+          <Image source={{ uri: arena.mine.data.mediaUri }} style={styles.myImage} contentFit="cover" transition={160} />
+          <Text style={styles.body}>Paid {skr(arena.mine.data.paidFee)} SKR to enter.</Text>
+        </Card>
+      ) : enterable.length === 0 ? (
+        // No disabled slab: the dead end becomes the loop. This seeds the chat
+        // composer with today's theme — a text seed, not a charge.
+        <Card>
+          <Text style={styles.title}>Make something for today</Text>
+          <Text style={styles.body}>
+            Generate an image in the chat — you pay for it as normal — then come back and enter it
+            for {skr(arena.fee)} SKR.
+          </Text>
+          <Action label={'Make one for "' + arena.theme + '"'} busy={false} onPress={() => onMake(`Make an image: ${arena.theme}, `)} />
+        </Card>
+      ) : (
+        <Card>
+          <Text style={styles.title}>Enter today's round</Text>
+          <Text style={styles.body}>
+            Pick one of your images. Entry is {skr(arena.fee)} SKR
+            {arena.isHolder ? ' — holder price, 20% off.' : '.'}
+          </Text>
+          <FlatList
+            horizontal
+            data={enterable}
+            keyExtractor={(r) => r.url!}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: space(2), paddingVertical: space(2) }}
+            renderItem={({ item }) => (
+              <Press
+                haptic="none"
+                onPress={() => {
+                  void tapSelect();
+                  setPicked(item.url!);
+                }}
+              >
+                <Image
+                  source={{ uri: item.url! }}
+                  style={[styles.pick, picked === item.url! && styles.pickOn]}
+                  contentFit="cover"
+                  transition={160}
+                />
+              </Press>
+            )}
+          />
+          <Action
+            label={picked ? `Enter · ${skr(arena.fee)} SKR` : 'Pick an image'}
+            busy={arena.busy}
+            disabled={!connected || !picked}
+            onPress={() => picked && void arena.enter(picked)}
+          />
+          {!connected ? <Connect onConnect={onConnect} connecting={connecting} /> : null}
+        </Card>
+      )}
+
+      <Split />
+    </Scroll>
+  );
+}
+
+/**
+ * Yesterday, closing the loop.
+ *
+ * If you placed, this is the one moment that earns a spring, a shine and a
+ * haptic — winning is rare, which is exactly what the delight budget is for.
+ * If you didn't, it is one quiet line, no motion.
+ */
+function Result({ arena }: { arena: ReturnType<typeof useArena> }) {
+  const y = arena.yesterday;
+  if (!y || !y.winner) return null;
+  const mine = y.mine;
+
+  if (mine) {
+    return (
+      <WinBanner place={mine.place}>
+        <Text style={styles.body}>
+          "{y.theme}" · {mine.votes} {mine.votes === 1 ? 'vote' : 'votes'}
+        </Text>
+        {mine.claimable ? (
+          <Action label="Claim your share" busy={arena.busy} onPress={() => void arena.claim(mine)} />
+        ) : (
+          <Chip text="Claimed" tone="green" />
+        )}
+      </WinBanner>
+    );
+  }
+
+  return (
+    <View style={styles.yesterday}>
+      {y.mediaUri ? (
+        <Image source={{ uri: y.mediaUri }} style={styles.thumb} contentFit="cover" transition={160} />
+      ) : null}
+      <Text style={[styles.meta, { flex: 1 }]} numberOfLines={2}>
+        Yesterday · "{y.theme}" · won by {shortAddress(y.winner)} with {y.winnerVotes}{' '}
+        {y.winnerVotes === 1 ? 'vote' : 'votes'}
+      </Text>
+    </View>
+  );
+}
+
+/** How the pot splits, as a bar — the voters' share is the mechanic worth seeing. */
+function Split() {
+  return (
+    <View style={styles.splitWrap}>
+      <View style={styles.splitBar}>
+        <View style={[styles.splitPart, { flex: 60, backgroundColor: colors.flame }]} />
+        <View style={[styles.splitPart, { flex: 25, backgroundColor: 'rgba(245,158,11,0.55)' }]} />
+        <View style={[styles.splitPart, { flex: 15, backgroundColor: 'rgba(245,158,11,0.3)' }]} />
+      </View>
+      <Text style={styles.meta}>Winner 60%  ·  Places 2–5 25%  ·  Early voters 15%</Text>
+      <Text style={styles.meta}>Payouts are permissionless — anyone can push them through, including you.</Text>
+    </View>
   );
 }
 
@@ -216,25 +300,36 @@ function Today({
 
 function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string | null }) {
   const { width } = useWindowDimensions();
-  const col = (width - space(3) * 3) / 2;
 
   if (arena.loading) return <Loading />;
   if (arena.entries.length === 0)
     return <Empty text="No entries yet. Be the first — the early votes are worth the most." />;
 
+  // One entry in a two-column grid is a card marooned beside a void.
+  const single = arena.entries.length === 1;
+  const col = single ? width - space(6) : (width - space(3) * 3) / 2;
+
   return (
     <FlatList
       data={arena.entries}
-      numColumns={2}
+      numColumns={single ? 1 : 2}
+      key={single ? 'one' : 'grid'}
       keyExtractor={(e) => e.address}
-      contentContainerStyle={styles.body}
-      columnWrapperStyle={{ gap: space(3) }}
+      contentContainerStyle={styles.list}
+      columnWrapperStyle={single ? undefined : { gap: space(3) }}
+      ListHeaderComponent={
+        <Text style={[styles.meta, { marginBottom: space(3) }]}>
+          One vote per wallet · {arena.voted ? 'yours is spent' : 'yours is unspent'}
+        </Text>
+      }
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => void arena.refresh()} tintColor={colors.flame} />}
       renderItem={({ item, index }) => (
         <EntryCard
           entry={item}
           width={col}
-          rank={index}
+          // A rank is meaningless in a field of one or two, and "#1 of 1" is
+          // invented social proof.
+          rank={arena.entries.length >= 3 && item.data.votes > 0 ? index + 1 : null}
           mine={item.data.entrant === me}
           canVote={!arena.voted && item.data.entrant !== me}
           busy={arena.busy}
@@ -256,27 +351,44 @@ function EntryCard({
 }: {
   entry: EntryWithAddress;
   width: number;
-  rank: number;
+  rank: number | null;
   mine: boolean;
   canVote: boolean;
   busy: boolean;
   onVote: () => void;
 }) {
+  // A blank tile is indistinguishable from a bug, so a failed image says so.
+  const [failed, setFailed] = useState(false);
+
   return (
-    <View style={[styles.entry, { width }]}>
-      <Image source={{ uri: entry.data.mediaUri }} style={{ width, height: width }} contentFit="cover" />
+    <View style={[styles.entry, { width }, mine && styles.entryMine]}>
+      {failed ? (
+        <View style={[styles.thumbFail, { width, height: width }]}>
+          <Text style={styles.meta}>image unavailable</Text>
+        </View>
+      ) : (
+        <Image
+          source={{ uri: entry.data.mediaUri }}
+          style={{ width, height: width }}
+          contentFit="cover"
+          transition={160}
+          onError={() => setFailed(true)}
+        />
+      )}
       <View style={styles.entryFoot}>
-        <View>
-          <Text style={styles.entryVotes}>
-            {entry.data.votes} {entry.data.votes === 1 ? 'vote' : 'votes'}
-            {rank < 5 && entry.data.votes > 0 ? `  ·  #${rank + 1}` : ''}
-          </Text>
-          <Text style={styles.entryWho}>{mine ? 'yours' : shortAddress(entry.data.entrant)}</Text>
+        <View style={styles.entryMeta}>
+          {rank ? <Rank place={rank} /> : null}
+          <View>
+            <Text style={[styles.value, styles.tnum]}>
+              {entry.data.votes} {entry.data.votes === 1 ? 'vote' : 'votes'}
+            </Text>
+            <Text style={styles.meta}>{mine ? 'yours' : shortAddress(entry.data.entrant)}</Text>
+          </View>
         </View>
         {canVote ? (
-          <Pressable onPress={onVote} disabled={busy} style={styles.voteBtn}>
+          <Press onPress={onVote} disabled={busy} style={styles.voteBtn}>
             <Text style={styles.voteText}>Vote</Text>
-          </Pressable>
+          </Press>
         ) : null}
       </View>
     </View>
@@ -285,98 +397,93 @@ function EntryCard({
 
 // ── You ────────────────────────────────────────────────────────────────────
 
-function You({ arena, address }: { arena: ReturnType<typeof useArena>; address: string | null }) {
+function You({
+  arena,
+  address,
+  onGoToday,
+}: {
+  arena: ReturnType<typeof useArena>;
+  address: string | null;
+  onGoToday: () => void;
+}) {
   const claimable = useMemo(() => arena.history.placings.filter((p) => p.claimable), [arena.history]);
-  if (!address) return <Empty text="Connect a wallet to see your balance and perks." />;
+  if (!address) return <Empty text="Connect a wallet to see your streak, balance and perks." />;
 
-  const toHolder = HOLDER_THRESHOLD - arena.held;
+  const progress = Math.min(1, Number(arena.held) / Number(HOLDER_THRESHOLD));
 
   return (
-    <FlatList
-      data={[]}
-      renderItem={null}
-      contentContainerStyle={styles.body}
-      ListHeaderComponent={
-        <View>
-          <Card>
-            <Text style={styles.cardTitle}>{skr(arena.held)} SKR</Text>
-            <Text style={styles.cardBody}>{shortAddress(address)}</Text>
-          </Card>
-
-          <Card>
-            <Text style={styles.cardTitle}>{arena.isHolder ? 'Holder perks — active' : 'Holder perks'}</Text>
-            <Text style={styles.cardBody}>
-              Hold {skr(HOLDER_THRESHOLD)} SKR and every entry costs 20% less. The discount is
-              enforced by the program, reading your own balance — not by this app.
-            </Text>
-            {!arena.isHolder ? (
-              <Text style={styles.cardBody}>{skr(toHolder)} SKR to go.</Text>
-            ) : (
-              <Text style={styles.perkOn}>Entry {skr(arena.fee)} SKR instead of 5</Text>
-            )}
-          </Card>
-
-          <Card>
-            <View style={styles.themeRow}>
-              <Stat label="Streak" value={arena.history.streak > 0 ? `${arena.history.streak}d` : '—'} />
-              <Stat label="Entered" value={String(arena.history.entered)} />
-              <Stat label="Wins" value={String(arena.history.wins)} />
-            </View>
-            <Text style={styles.cardBody}>
-              Counted from the chain, not this phone — reinstall it and your streak is still yours.
-            </Text>
-          </Card>
-
-          {claimable.length > 0 ? (
-            <Card>
-              <Text style={styles.cardTitle}>Winnings to claim</Text>
-              <Text style={styles.cardBody}>
-                Payouts are permissionless: this pushes yours through yourself.
-              </Text>
-              {claimable.map((p) => (
-                <View key={`${p.roundId}`} style={styles.claimRow}>
-                  <View>
-                    <Text style={styles.entryVotes}>
-                      {p.place === 1 ? 'Winner' : `Place ${p.place}`} · {p.votes} votes
-                    </Text>
-                    <Text style={styles.entryWho}>{dayLabel(p.roundId)}</Text>
-                  </View>
-                  <Pressable
-                    onPress={() => void arena.claim(p)}
-                    disabled={arena.busy}
-                    style={styles.voteBtn}
-                  >
-                    <Text style={styles.voteText}>Claim</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </Card>
-          ) : null}
-
-          <Card>
-            <Text style={styles.cardTitle}>Today</Text>
-            <Text style={styles.cardBody}>
-              {arena.mine ? `Entered · ${arena.mine.data.votes} votes` : 'Not entered yet'}
-              {'\n'}
-              {arena.voted ? 'Voted' : 'No vote cast'}
-            </Text>
-          </Card>
+    <Scroll onRefresh={arena.refresh}>
+      {/* The streak leads: it is the number that hurts to break. A balance of
+          zero is the worst possible opening line for a new player. */}
+      <Card>
+        <Text style={styles.label}>DAY STREAK</Text>
+        <Text style={[styles.display, styles.tnum]}>{arena.history.streak > 0 ? arena.history.streak : '—'}</Text>
+        {arena.history.streak > 0 ? (
+          <Text style={styles.meta}>
+            Entered {arena.history.entered} · Won {arena.history.wins}
+          </Text>
+        ) : (
+          <Press onPress={onGoToday} haptic="none" style={styles.linkRow}>
+            <Text style={styles.link}>Enter today to start a streak →</Text>
+          </Press>
+        )}
+        <View style={styles.chipRow}>
+          <Chip text={arena.mine ? 'Entered' : 'Not entered'} tone={arena.mine ? 'green' : 'flame'} />
+          <Chip text={arena.voted ? 'Voted' : 'No vote cast'} tone={arena.voted ? 'green' : 'flame'} />
         </View>
-      }
-    />
+        <Text style={[styles.meta, styles.hair]}>
+          {skr(arena.held)} SKR · {shortAddress(address)} — counted from the chain, so a reinstall
+          keeps your streak.
+        </Text>
+      </Card>
+
+      {claimable.length > 0 ? (
+        <Card>
+          <Text style={styles.title}>Winnings to claim</Text>
+          {claimable.map((p) => (
+            <View key={`${p.roundId}`} style={styles.claimRow}>
+              <View>
+                <Text style={styles.value}>{p.place === 1 ? 'Winner' : `Place ${p.place}`}</Text>
+                <Text style={styles.meta}>
+                  {dayLabel(p.roundId)} · {p.votes} {p.votes === 1 ? 'vote' : 'votes'}
+                </Text>
+              </View>
+              <Press onPress={() => void arena.claim(p)} disabled={arena.busy} style={styles.voteBtn}>
+                <Text style={styles.voteText}>Claim</Text>
+              </Press>
+            </View>
+          ))}
+        </Card>
+      ) : null}
+
+      <Card>
+        <Text style={styles.title}>{arena.isHolder ? 'Holder perks — active' : 'Holder perks'}</Text>
+        <Text style={styles.body}>Hold 100 SKR → entries cost 20% less, enforced on-chain.</Text>
+        <View style={styles.track}>
+          <View style={[styles.fill, { width: `${progress * 100}%` }]} />
+        </View>
+        <Text style={[styles.meta, styles.tnum]}>
+          {skr(arena.held)} / {skr(HOLDER_THRESHOLD)} SKR
+          {arena.isHolder ? ` · entry ${skr(arena.fee)} instead of 5` : ''}
+        </Text>
+      </Card>
+    </Scroll>
   );
 }
 
 // ── bits ───────────────────────────────────────────────────────────────────
 
-const Card = ({ children }: { children: React.ReactNode }) => <View style={styles.card}>{children}</View>;
-
-const Stat = ({ label, value }: { label: string; value: string }) => (
-  <View>
-    <Text style={styles.statLabel}>{label}</Text>
-    <Text style={styles.statValue}>{value}</Text>
-  </View>
+const Scroll = ({ children, onRefresh }: { children: React.ReactNode; onRefresh: () => Promise<void> }) => (
+  <FlatList
+    data={[]}
+    renderItem={null}
+    contentContainerStyle={styles.list}
+    refreshControl={<RefreshControl refreshing={false} onRefresh={() => void onRefresh()} tintColor={colors.flame} />}
+    ListHeaderComponent={<View>{children}</View>}
+  />
 );
+
+const Card = ({ children }: { children: React.ReactNode }) => <View style={styles.card}>{children}</View>;
 
 const Loading = () => (
   <View style={styles.center}>
@@ -386,16 +493,17 @@ const Loading = () => (
 
 const Empty = ({ text }: { text: string }) => (
   <View style={styles.center}>
-    <Text style={styles.empty}>{text}</Text>
+    <Text style={[styles.body, { textAlign: 'center' }]}>{text}</Text>
   </View>
 );
 
 const Connect = ({ onConnect, connecting }: { onConnect: () => Promise<void>; connecting: boolean }) => (
-  <Pressable onPress={() => void onConnect()} disabled={connecting} style={styles.connect}>
-    <Text style={styles.connectText}>{connecting ? 'Opening wallet…' : 'Connect wallet'}</Text>
+  <Pressable onPress={() => void onConnect()} disabled={connecting} style={styles.linkRow}>
+    <Text style={styles.link}>{connecting ? 'Opening wallet…' : 'Connect wallet'}</Text>
   </Pressable>
 );
 
+/** Filled amber = an action that costs or wins money. Disabled goes ghost, never dimmed-amber. */
 function Action({
   label,
   onPress,
@@ -407,10 +515,17 @@ function Action({
   busy: boolean;
   disabled?: boolean;
 }) {
+  if (disabled) {
+    return (
+      <View style={[styles.action, styles.actionGhost]}>
+        <Text style={[styles.actionText, { color: colors.textDim }]}>{label}</Text>
+      </View>
+    );
+  }
   return (
-    <Pressable onPress={onPress} disabled={busy || disabled} style={[styles.action, (busy || disabled) && styles.actionOff]}>
+    <Press onPress={onPress} disabled={busy} style={[styles.action, busy && { opacity: 0.6 }]}>
       {busy ? <ActivityIndicator color={colors.ink} size="small" /> : <Text style={styles.actionText}>{label}</Text>}
-    </Pressable>
+    </Press>
   );
 }
 
@@ -425,9 +540,12 @@ function dayLabel(roundId: bigint): string {
 /** Time left, ticking once a minute — a per-second countdown is a per-second re-render. */
 function useCountdown(endsAt: number | null): string {
   const [now, setNow] = useState(() => Date.now());
+  const tick = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(t);
+    tick.current = setInterval(() => setNow(Date.now()), 60_000);
+    return () => {
+      if (tick.current) clearInterval(tick.current);
+    };
   }, []);
   if (!endsAt) return '—';
   const ms = endsAt * 1000 - now;
@@ -446,50 +564,77 @@ const styles = StyleSheet.create({
     paddingHorizontal: space(4),
     paddingVertical: space(3),
   },
-  title: { color: colors.text, fontSize: 24, fontWeight: '700' },
-  sub: { color: colors.textFaint, fontSize: 12, marginTop: 2 },
+  // The modal title is navigation, not content — it must not compete with the theme.
+  navTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   close: { paddingHorizontal: space(3), paddingVertical: space(2) },
-  closeText: { color: colors.flameSoft, fontSize: 15, fontWeight: '600' },
+  closeText: { color: colors.textDim, fontSize: 15, fontWeight: '600' },
 
-  tabs: { flexDirection: 'row', gap: space(2), paddingHorizontal: space(4), paddingBottom: space(3) },
-  tab: { paddingHorizontal: space(3), paddingVertical: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
-  tabOn: { backgroundColor: colors.flame },
-  tabText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
-  tabTextOn: { color: colors.ink },
+  // Type tiers.
+  display: { color: colors.text, fontSize: 40, fontWeight: '800', letterSpacing: -1 },
+  title: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  body: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
+  label: { color: colors.textDim, fontSize: 11, fontWeight: '600', letterSpacing: 0.8 },
+  value: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  meta: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
+  tnum: { fontVariant: ['tabular-nums'] },
+  link: { color: colors.flameSoft, fontSize: 13, fontWeight: '600' },
+  linkRow: { alignSelf: 'flex-start', paddingVertical: space(2) },
+  hair: { borderTopWidth: 1, borderTopColor: colors.borderFaint, paddingTop: space(2) },
 
-  body: { padding: space(3), paddingBottom: space(10), gap: space(3) },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) },
-
-  themeCard: {
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: space(4),
+  tabs: {
+    flexDirection: 'row',
+    gap: space(1),
+    padding: space(1),
+    marginHorizontal: space(4),
     marginBottom: space(3),
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
   },
-  themeLabel: { color: colors.flameSoft, fontSize: 10, letterSpacing: 1.2, fontWeight: '700' },
-  theme: { color: colors.text, fontSize: 22, fontWeight: '700', marginTop: space(2) },
-  themeRow: { flexDirection: 'row', gap: space(6), marginTop: space(4) },
-  statLabel: { color: colors.textFaint, fontSize: 11 },
-  statValue: { color: colors.text, fontSize: 16, fontWeight: '600', marginTop: 2 },
+  tab: { flex: 1, paddingVertical: space(2), borderRadius: radius.pill, alignItems: 'center' },
+  tabOn: { backgroundColor: colors.surfaceStrong },
+  tabText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
+  tabTextOn: { color: colors.text, fontWeight: '700' },
 
+  list: { padding: space(3), paddingBottom: space(10) },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) },
+  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  chipRow: { flexDirection: 'row', gap: space(2), marginTop: space(1) },
+  ends: { marginLeft: 'auto', alignItems: 'flex-end' },
+  endsValue: { color: colors.text, fontSize: 20, fontWeight: '700', marginTop: 2 },
+
+  // One card spec: 16 radius, 16 padding, surface, hairline border.
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.borderFaint,
+    borderColor: colors.border,
     padding: space(4),
-    marginBottom: space(3),
+    marginBottom: space(4),
     gap: space(2),
   },
-  cardTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  cardBody: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
-  perkOn: { color: colors.green, fontSize: 13, fontWeight: '600' },
-  myImage: { width: '100%', aspectRatio: 1, borderRadius: radius.md, marginTop: space(2) },
+  // Nested media: parent radius (16) − padding (16), floored at 8.
+  myImage: { width: '100%', aspectRatio: 1, borderRadius: 8, marginTop: space(1) },
 
-  pick: { width: 84, height: 84, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent' },
+  pick: { width: 84, height: 84, borderRadius: 8, borderWidth: 2, borderColor: 'transparent' },
   pickOn: { borderColor: colors.flame },
+
+  yesterday: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space(3),
+    padding: space(3),
+    marginBottom: space(4),
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderFaint,
+  },
+  thumb: { width: 44, height: 44, borderRadius: 8 },
+  thumbFail: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceStrong },
+
+  splitWrap: { gap: space(2), paddingHorizontal: space(1), marginTop: space(1) },
+  splitBar: { flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', gap: 2 },
+  splitPart: { height: 6 },
 
   action: {
     backgroundColor: colors.flame,
@@ -497,11 +642,11 @@ const styles = StyleSheet.create({
     paddingVertical: space(3),
     alignItems: 'center',
     marginTop: space(2),
+    minHeight: 48,
+    justifyContent: 'center',
   },
-  actionOff: { opacity: 0.45 },
+  actionGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
   actionText: { color: colors.ink, fontWeight: '700', fontSize: 15 },
-  connect: { alignItems: 'center', paddingVertical: space(2) },
-  connectText: { color: colors.flameSoft, fontSize: 13, fontWeight: '600' },
 
   entry: {
     backgroundColor: colors.surface,
@@ -511,9 +656,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderFaint,
   },
-  entryFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: space(2) },
-  entryVotes: { color: colors.text, fontSize: 12, fontWeight: '600' },
-  entryWho: { color: colors.textFaint, fontSize: 11, marginTop: 1 },
+  entryMine: { borderColor: 'rgba(245,158,11,0.45)' },
+  entryFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: space(3),
+    gap: space(2),
+  },
+  entryMeta: { flexDirection: 'row', alignItems: 'center', gap: space(2), flexShrink: 1 },
+  // 44 is the floor for the most-repeated action in the product.
+  voteBtn: {
+    backgroundColor: colors.flame,
+    borderRadius: radius.pill,
+    paddingHorizontal: space(4),
+    paddingVertical: space(3),
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  voteText: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+
   claimRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -522,11 +684,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.borderFaint,
   },
-  voteBtn: { backgroundColor: colors.flame, borderRadius: radius.pill, paddingHorizontal: space(3), paddingVertical: space(1) },
-  voteText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
 
-  empty: { color: colors.textFaint, fontSize: 13, textAlign: 'center', lineHeight: 19 },
-  fine: { color: colors.textGhost, fontSize: 11, lineHeight: 17, paddingHorizontal: space(1) },
+  track: { height: 6, borderRadius: 3, backgroundColor: colors.surfaceStrong, overflow: 'hidden' },
+  fill: { height: 6, backgroundColor: colors.flame },
 
   error: {
     marginHorizontal: space(3),
@@ -538,5 +698,4 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(248,113,113,0.3)',
   },
   errorText: { color: colors.red, fontSize: 13 },
-  errorHint: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
 });

@@ -103,7 +103,7 @@ export function Pot({ amount, label = 'Pot' }: { amount: string; label?: string 
 
   return (
     <View>
-      <Text style={styles.potLabel}>{label}</Text>
+      <Text style={styles.potLabel}>{label.toUpperCase()}</Text>
       <Animated.View style={[styles.potRow, animated]}>
         <Text style={styles.potValue}>{amount}</Text>
         <Text style={styles.potUnit}>SKR</Text>
@@ -191,7 +191,7 @@ export function WinBanner({ place, children }: { place: number; children: React.
 }
 
 const styles = StyleSheet.create({
-  potLabel: { color: colors.textFaint, fontSize: 11, letterSpacing: 0.5 },
+  potLabel: { color: colors.textDim, fontSize: 11, fontWeight: '600', letterSpacing: 0.8 },
   potRow: { flexDirection: 'row', alignItems: 'baseline', gap: space(1) },
   potValue: { color: colors.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
   potUnit: { color: colors.flameSoft, fontSize: 13, fontWeight: '700' },
