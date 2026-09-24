@@ -445,19 +445,31 @@ function Home({
         },
       ]}
       footer={
-        <View style={styles.quest}>
-          <Text style={styles.questLabel}>TODAY'S QUEST</Text>
-          <Text style={styles.questText} numberOfLines={2}>
-            {peek.theme}
-          </Text>
+        <>
+          {/* A signpost, not a status bar: a solid object planted in the world
+              that takes you to the round it describes. Opaque wood-dark fill and
+              a hard bottom edge, so it reads as a thing rather than a panel
+              floating over the art. */}
+          <Pressable style={styles.quest} onPress={onArena}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.questLabel}>TODAY'S QUEST</Text>
+              <Text style={styles.questText} numberOfLines={2}>
+                {peek.theme}
+              </Text>
+              <Text style={styles.questMeta}>
+                {peek.open ? `${peek.entries} entered · ${left ?? 'closing'} left` : 'no round open yet'}
+              </Text>
+            </View>
+            <Text style={styles.questChevron}>›</Text>
+          </Pressable>
           {last ? (
-            <Pressable onPress={() => onOpenChat(last.id)} hitSlop={6}>
-              <Text style={styles.questResume} numberOfLines={1}>
+            <Pressable onPress={() => onOpenChat(last.id)} style={styles.resume} hitSlop={6}>
+              <Text style={styles.resumeText} numberOfLines={1}>
                 ▸ resume · {last.title}
               </Text>
             </Pressable>
           ) : null}
-        </View>
+        </>
       }
     />
   );
@@ -611,33 +623,35 @@ const styles = StyleSheet.create({
   },
   hudClockText: { color: colors.flameSoft, fontSize: 9, fontFamily: font.pixel },
   // A quest banner, not a toolbar.
-  // No panel: the text sits ON the world, held together by hard shadows the way
-  // the node labels are. A dark slab across the bottom was the HUD again.
-  quest: { gap: space(1), alignItems: 'center' },
-  questLabel: {
-    color: colors.flameSoft,
-    fontSize: 8,
-    fontFamily: font.pixel,
-    letterSpacing: 1.4,
-    textShadowColor: '#000',
-    textShadowRadius: 6,
+  quest: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space(3),
+    paddingHorizontal: space(4),
+    paddingVertical: space(3),
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.flame,
+    // Opaque, and darker than the app's surfaces: a painted board, not glass.
+    backgroundColor: '#17110b',
+    borderBottomWidth: 4,
+    borderBottomColor: colors.flameDeep,
   },
-  questText: {
-    color: colors.text,
-    fontSize: 12,
-    fontFamily: font.pixel,
-    lineHeight: 20,
-    textAlign: 'center',
-    textShadowColor: '#000',
-    textShadowRadius: 6,
+  questLabel: { color: colors.flameSoft, fontSize: 8, fontFamily: font.pixel, letterSpacing: 1.4 },
+  questText: { color: colors.text, fontSize: 12, fontFamily: font.pixel, lineHeight: 20, marginTop: space(2) },
+  questMeta: { color: colors.textDim, fontSize: 12, marginTop: space(1) },
+  questChevron: { color: colors.flameSoft, fontSize: 28, marginTop: -4 },
+  resume: {
+    marginTop: space(2),
+    alignSelf: 'flex-start',
+    paddingHorizontal: space(3),
+    paddingVertical: space(2),
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: 'rgba(11,11,14,0.95)',
   },
-  questResume: {
-    color: colors.textDim,
-    fontSize: 12,
-    marginTop: space(1),
-    textShadowColor: '#000',
-    textShadowRadius: 6,
-  },
+  resumeText: { color: colors.textDim, fontSize: 12 },
   sectionLabel: {
     alignSelf: 'flex-start',
     color: colors.textDim,

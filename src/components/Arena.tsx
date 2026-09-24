@@ -375,18 +375,19 @@ function EntryCard({
           onError={() => setFailed(true)}
         />
       )}
+      {/* Stacked, not side by side: at half the screen width, pixel type and a
+          44px button cannot share a row, and the button ended up sitting on top
+          of the vote count. */}
       <View style={styles.entryFoot}>
         <View style={styles.entryMeta}>
           {rank ? <Rank place={rank} /> : null}
-          <View>
-            <Text style={[styles.value, styles.tnum]}>
-              {entry.data.votes} {entry.data.votes === 1 ? 'vote' : 'votes'}
-            </Text>
-            <Text style={styles.meta} numberOfLines={1}>
-              {mine ? 'yours' : shortAddress(entry.data.entrant)}
-            </Text>
-          </View>
+          <Text style={[styles.value, styles.tnum]} numberOfLines={1}>
+            {entry.data.votes} {entry.data.votes === 1 ? 'vote' : 'votes'}
+          </Text>
         </View>
+        <Text style={styles.meta} numberOfLines={1}>
+          {mine ? 'yours' : shortAddress(entry.data.entrant)}
+        </Text>
         {canVote ? (
           <Press onPress={onVote} disabled={busy} style={styles.voteBtn}>
             <Text style={styles.voteText}>Vote</Text>
@@ -669,23 +670,19 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   entryMine: { borderColor: colors.flame },
-  entryFoot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: space(3),
-    gap: space(2),
-  },
-  entryMeta: { flexDirection: 'row', alignItems: 'center', gap: space(2), flex: 1, minWidth: 0 },
+  // Stacked, not a row: at half the screen width pixel type and a 44px button
+  // cannot share a line, and the button ended up on top of the vote count.
+  entryFoot: { padding: space(3), gap: space(2) },
+  entryMeta: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   // 44 is the floor for the most-repeated action in the product.
   voteBtn: {
     backgroundColor: colors.flame,
     borderRadius: px.radius,
     borderBottomWidth: px.offset,
     borderBottomColor: colors.flameDeep,
-    paddingHorizontal: space(4),
     paddingVertical: space(3),
     minHeight: 44,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   voteText: { color: colors.ink, fontSize: 9, fontFamily: font.pixel },
