@@ -23,6 +23,7 @@ import { MessageBubble } from './src/components/MessageBubble';
 import { Sidebar } from './src/components/Sidebar';
 import { Showcase } from './src/components/Showcase';
 import { Arena } from './src/components/Arena';
+import { usePeek, timeLeft } from './src/arena/usePeek';
 import { ConnectWallet } from './src/components/ConnectWallet';
 import { MenuIcon } from './src/components/icons';
 import { Backdrop } from './src/components/Backdrop';
@@ -84,6 +85,8 @@ function Main() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showcaseOpen, setShowcaseOpen] = useState(false);
   const [arenaOpen, setArenaOpen] = useState(false);
+  // The header pill earns its space by carrying today's deadline, not a label.
+  const peek = usePeek();
   const [hydrated, setHydrated] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -246,7 +249,7 @@ function Main() {
             <MenuIcon size={20} color={colors.textDim} />
           </Pressable>
           <Pressable onPress={() => setArenaOpen(true)} hitSlop={8} style={styles.arenaBtn}>
-            <Text style={styles.arenaText}>◈ Arena</Text>
+            <Text style={styles.arenaText}>◈ {timeLeft(peek.endsAt) ?? 'Arena'}</Text>
           </Pressable>
           {active && messages.length > 0 ? (
             <Text style={styles.headerTitle} numberOfLines={1}>
@@ -288,6 +291,7 @@ function Main() {
                 message={m}
                 onApproved={(result) => addResult(active!.id, result)}
                 onDraft={(patch) => updateDraft(active!.id, m.id, patch)}
+                onEnterArena={() => setArenaOpen(true)}
               />
             ))}
             {typing && (
