@@ -197,8 +197,8 @@ export function MapBoard({
 
 const styles = StyleSheet.create({
   board: { flex: 1, backgroundColor: colors.ink, overflow: 'hidden' },
-  scrimTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 140, backgroundColor: 'rgba(10,10,13,0.55)' },
-  scrimBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 230, backgroundColor: 'rgba(10,10,13,0.78)' },
+  scrimTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 130, backgroundColor: 'rgba(10,10,13,0.45)' },
+  scrimBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 150, backgroundColor: 'rgba(10,10,13,0.35)' },
   hud: {
     position: 'absolute',
     left: 0,

@@ -221,7 +221,10 @@ function Main() {
         conversations={conversations}
         activeId={activeId}
         onClose={() => setSidebarOpen(false)}
-        onNew={newChat}
+        onNew={() => {
+          newChat();
+          setView('chat');
+        }}
         onSelect={(id) => {
           setActiveId(id);
           setView('chat');
@@ -432,9 +435,11 @@ function Home({
           id: 'showcase',
           label: 'SHOWCASE',
           x: 0.45,
-          y: 0.7,
+          // Lower than the roof line: the label hangs off the bottom of the hit
+          // box, and at 0.70 that landed in the middle of the gallery's facade.
+          y: 0.745,
           w: 0.56,
-          h: 0.09,
+          h: 0.1,
           status: 'what others made',
           onPress: onShowcase,
         },
@@ -606,17 +611,33 @@ const styles = StyleSheet.create({
   },
   hudClockText: { color: colors.flameSoft, fontSize: 9, fontFamily: font.pixel },
   // A quest banner, not a toolbar.
-  quest: {
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: 'rgba(245,158,11,0.45)',
-    backgroundColor: 'rgba(11,11,14,0.92)',
-    padding: space(4),
-    gap: space(2),
+  // No panel: the text sits ON the world, held together by hard shadows the way
+  // the node labels are. A dark slab across the bottom was the HUD again.
+  quest: { gap: space(1), alignItems: 'center' },
+  questLabel: {
+    color: colors.flameSoft,
+    fontSize: 8,
+    fontFamily: font.pixel,
+    letterSpacing: 1.4,
+    textShadowColor: '#000',
+    textShadowRadius: 6,
   },
-  questLabel: { color: colors.flameSoft, fontSize: 8, fontFamily: font.pixel, letterSpacing: 1.4 },
-  questText: { color: colors.text, fontSize: 12, fontFamily: font.pixel, lineHeight: 20 },
-  questResume: { color: colors.textDim, fontSize: 12, marginTop: space(1) },
+  questText: {
+    color: colors.text,
+    fontSize: 12,
+    fontFamily: font.pixel,
+    lineHeight: 20,
+    textAlign: 'center',
+    textShadowColor: '#000',
+    textShadowRadius: 6,
+  },
+  questResume: {
+    color: colors.textDim,
+    fontSize: 12,
+    marginTop: space(1),
+    textShadowColor: '#000',
+    textShadowRadius: 6,
+  },
   sectionLabel: {
     alignSelf: 'flex-start',
     color: colors.textDim,
