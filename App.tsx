@@ -17,13 +17,13 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { WalletProvider } from './src/lib/mwa';
 import { agentChat, agentConfigured, agentDeleteConversation, usd } from './src/lib/api';
 import { loadState, saveState } from './src/lib/storage';
-import { colors, radius, space } from './src/theme';
+import { colors, font, radius, space } from './src/theme';
 import { Composer } from './src/components/Composer';
 import { MessageBubble } from './src/components/MessageBubble';
 import { Sidebar } from './src/components/Sidebar';
 import { Showcase } from './src/components/Showcase';
 import { Arena } from './src/components/Arena';
-import { usePeek, timeLeft } from './src/arena/usePeek';
+import { usePeek, timeLeft, type Peek } from './src/arena/usePeek';
 import { ConnectWallet } from './src/components/ConnectWallet';
 import { MenuIcon } from './src/components/icons';
 import { Backdrop } from './src/components/Backdrop';
@@ -85,6 +85,15 @@ function Main() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showcaseOpen, setShowcaseOpen] = useState(false);
   const [arenaOpen, setArenaOpen] = useState(false);
+  /**
+   * The app lands on Home — two destinations, not a composer.
+   *
+   * The chat is still one tap away and a tapped suggestion goes straight into
+   * it, so the cost is a tap for someone who came to generate, and the gain is
+   * that the round (which is the reason to open the app tomorrow) is the first
+   * thing anyone sees.
+   */
+  const [view, setView] = useState<'home' | 'chat'>('home');
   // The header pill earns its space by carrying today's deadline, not a label.
   const peek = usePeek();
   const [hydrated, setHydrated] = useState(false);
@@ -214,6 +223,7 @@ function Main() {
         onNew={newChat}
         onSelect={(id) => {
           setActiveId(id);
+          setView('chat');
           setSidebarOpen(false);
         }}
         onDelete={deleteChat}
@@ -245,15 +255,28 @@ function Main() {
 
       <View style={[styles.header, { paddingTop: insets.top + space(2) }]}>
         <View style={styles.headerLeft}>
-          <Pressable onPress={() => setSidebarOpen(true)} hitSlop={8} style={styles.menuBtn}>
-            <MenuIcon size={20} color={colors.textDim} />
+          <Pressable
+            onPress={() => (view === 'chat' ? setView('home') : setSidebarOpen(true))}
+            hitSlop={8}
+            style={styles.menuBtn}
+          >
+            {view === 'chat' ? (
+              <Text style={styles.backIcon}>‹</Text>
+            ) : (
+              <MenuIcon size={20} color={colors.textDim} />
+            )}
           </Pressable>
           <Pressable onPress={() => setArenaOpen(true)} hitSlop={8} style={styles.arenaBtn}>
             <Text style={styles.arenaText}>◈ {timeLeft(peek.endsAt) ?? 'Arena'}</Text>
           </Pressable>
-          {active && messages.length > 0 ? (
+          {view === 'chat' && active && messages.length > 0 ? (
             <Text style={styles.headerTitle} numberOfLines={1}>
               {active.title}
+            </Text>
+          ) : view === 'home' ? (
+            // On Home the conversation title is not the subject — the app is.
+            <Text style={styles.wordmark}>
+              Gliana<Text style={styles.emptyAccent}>Agent</Text>
             </Text>
           ) : (
             <View style={styles.statusPill}>
@@ -275,8 +298,23 @@ function Main() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={insets.top + 56}
       >
-        {messages.length === 0 ? (
-          <EmptyState onPick={send} />
+        {view === 'home' ? (
+          <Home
+            onPick={send}
+            peek={peek}
+            onArena={() => setArenaOpen(true)}
+            conversations={conversations}
+            onOpenChat={(id) => {
+              setActiveId(id);
+              setView('chat');
+            }}
+            onNewChat={() => {
+              newChat();
+              setView('chat');
+            }}
+          />
+        ) : messages.length === 0 ? (
+          <EmptyState onPick={send} peek={peek} onArena={() => setArenaOpen(true)} />
         ) : (
           <ScrollView
             ref={scrollRef}
@@ -303,15 +341,126 @@ function Main() {
           </ScrollView>
         )}
 
-        <View style={{ paddingBottom: insets.bottom }}>
-          <Composer onSend={send} disabled={typing} />
-        </View>
+        {view === 'chat' ? (
+          <View style={{ paddingBottom: insets.bottom }}>
+            <Composer onSend={send} disabled={typing} />
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-function EmptyState({ onPick }: { onPick: (text: string) => void }) {
+/**
+ * The home screen doubles as the map: two destinations, then the openers.
+ *
+ * Deliberately NOT a title screen on every launch. A menu in front of the
+ * composer is a tap between the user and the thing they opened the app for, and
+ * returning to a conversation still lands straight in it. This only shows where
+ * there is nothing to return to — which is exactly where a map helps.
+ */
+/**
+ * Home — the first screen, and the map.
+ *
+ * Two destinations and nothing else above the fold: today's round, and making
+ * something. Recent chats sit under them so returning to yesterday's work is
+ * one tap, and the openers stay because "what can this even do" is the first
+ * question a new player has.
+ *
+ * Pixel type appears ONLY on the Arena card here. The chat half of the app
+ * stays a calm tool; the contrast is what makes the Arena feel like a place.
+ */
+function Home({
+  onPick,
+  peek,
+  onArena,
+  conversations,
+  onOpenChat,
+  onNewChat,
+}: {
+  onPick: (text: string) => void;
+  peek: Peek;
+  onArena: () => void;
+  conversations: Conversation[];
+  onOpenChat: (id: string) => void;
+  onNewChat: () => void;
+}) {
+  const left = timeLeft(peek.endsAt);
+  const recent = conversations.slice(0, 3);
+
+  return (
+    <ScrollView contentContainerStyle={styles.home} keyboardShouldPersistTaps="handled">
+      <Text style={styles.homeHi}>
+        What should we <Text style={styles.emptyAccent}>make</Text>?
+      </Text>
+      <Text style={styles.emptySub}>
+        Describe it and the agent picks the model, quotes the exact price, and you pay per result.
+      </Text>
+
+      <Pressable style={styles.arenaCard} onPress={onArena}>
+        <View style={styles.arenaCardHead}>
+          <Text style={styles.arenaCardLabel}>◈  TODAY'S ARENA</Text>
+          {left ? <Text style={styles.arenaCardClock}>{left}</Text> : null}
+        </View>
+        <Text style={styles.arenaCardTheme} numberOfLines={2}>
+          {peek.theme}
+        </Text>
+        <Text style={styles.arenaCardMeta}>
+          {peek.open
+            ? `${peek.entries} ${peek.entries === 1 ? 'entry' : 'entries'} · enter yours with SKR`
+            : 'No round open yet — open it and set the pace'}
+        </Text>
+      </Pressable>
+
+      <Pressable style={styles.makeCard} onPress={onNewChat}>
+        <Text style={styles.makeTitle}>✦  Make something</Text>
+        <Text style={styles.arenaCardMeta}>Image, video, music, voice — 100+ models, one prompt</Text>
+      </Pressable>
+
+      {recent.length > 0 ? (
+        <>
+          <Text style={styles.sectionLabel}>PICK UP WHERE YOU LEFT OFF</Text>
+          {recent.map((c) => (
+            <Pressable key={c.id} style={styles.recent} onPress={() => onOpenChat(c.id)}>
+              <Text style={styles.recentText} numberOfLines={1}>
+                {c.title}
+              </Text>
+            </Pressable>
+          ))}
+        </>
+      ) : null}
+
+      <Text style={styles.sectionLabel}>OR START FROM ONE OF THESE</Text>
+      <View style={styles.cards}>
+        {SUGGESTIONS.map((s) => (
+          <Pressable key={s.tag} style={styles.card} onPress={() => onPick(s.send)}>
+            <View style={styles.cardHead}>
+              <Svg width={14} height={14} viewBox="0 0 16 16" fill={colors.flameSoft}>
+                <Path d={CAT_ICON[s.tag] ?? CAT_ICON.Image} />
+              </Svg>
+              <Text style={styles.cardTag}>{s.tag}</Text>
+            </View>
+            <Text style={styles.cardPrompt}>{s.prompt}</Text>
+            <Text style={styles.cardModel} numberOfLines={1}>
+              {s.model}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function EmptyState({
+  onPick,
+  peek,
+  onArena,
+}: {
+  onPick: (text: string) => void;
+  peek: Peek;
+  onArena: () => void;
+}) {
+  const left = timeLeft(peek.endsAt);
   return (
     <ScrollView contentContainerStyle={styles.empty} keyboardShouldPersistTaps="handled">
       <View style={styles.pill}>
@@ -324,6 +473,25 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
       <Text style={styles.emptySub}>
         Describe it. The agent picks the model, quotes the exact price, and you pay per result.
       </Text>
+
+      {/* Destination one: today's round. Pixel type here and nowhere else in
+          the chat — the Arena is a place you go, not a skin over everything. */}
+      <Pressable style={styles.arenaCard} onPress={onArena}>
+        <View style={styles.arenaCardHead}>
+          <Text style={styles.arenaCardLabel}>◈  TODAY'S ARENA</Text>
+          {left ? <Text style={styles.arenaCardClock}>{left}</Text> : null}
+        </View>
+        <Text style={styles.arenaCardTheme} numberOfLines={2}>
+          {peek.theme}
+        </Text>
+        <Text style={styles.arenaCardMeta}>
+          {peek.open
+            ? `${peek.entries} ${peek.entries === 1 ? 'entry' : 'entries'} · enter yours with SKR`
+            : 'No round open yet — open it and set the pace'}
+        </Text>
+      </Pressable>
+
+      <Text style={styles.sectionLabel}>OR MAKE SOMETHING</Text>
       <View style={styles.cards}>
         {SUGGESTIONS.map((s) => (
           <Pressable key={s.tag} style={styles.card} onPress={() => onPick(s.send)}>
@@ -370,6 +538,54 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(245,158,11,0.3)',
   },
   arenaText: { color: colors.flameSoft, fontSize: 12, fontWeight: '700' },
+  arenaCard: {
+    width: '100%',
+    marginTop: space(6),
+    padding: space(4),
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: 'rgba(245,158,11,0.45)',
+    backgroundColor: 'rgba(245,158,11,0.08)',
+    gap: space(2),
+  },
+  arenaCardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  arenaCardLabel: { color: colors.flameSoft, fontSize: 8, fontFamily: font.pixel, letterSpacing: 1 },
+  arenaCardClock: { color: colors.text, fontSize: 10, fontFamily: font.pixel },
+  arenaCardTheme: { color: colors.text, fontSize: 14, fontFamily: font.pixel, lineHeight: 22 },
+  arenaCardMeta: { color: colors.textDim, fontSize: 12 },
+  home: { padding: space(5), paddingBottom: space(12) },
+  homeHi: { color: colors.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
+  makeCard: {
+    marginTop: space(3),
+    padding: space(4),
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    gap: space(2),
+  },
+  makeTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  recent: {
+    marginTop: space(2),
+    paddingHorizontal: space(4),
+    paddingVertical: space(3),
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderFaint,
+  },
+  recentText: { color: colors.textDim, fontSize: 14 },
+  backIcon: { color: colors.textDim, fontSize: 30, lineHeight: 30, marginTop: -4 },
+  wordmark: { color: colors.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
+  sectionLabel: {
+    alignSelf: 'flex-start',
+    color: colors.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginTop: space(7),
+    marginBottom: space(1),
+  },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), flexShrink: 1 },
   statusDot: { width: 6, height: 6, borderRadius: 6, backgroundColor: colors.green },
   statusText: { color: colors.textFaint, fontSize: 12 },

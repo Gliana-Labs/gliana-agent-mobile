@@ -7,19 +7,36 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { fetchRound } from './client';
-import { roundIdFor } from './config';
+import { roundIdFor, themeFor } from './config';
 
-export function usePeek(): { endsAt: number | null; open: boolean } {
+export interface Peek {
+  endsAt: number | null;
+  /** The round's own theme once it exists, else today's derived one. */
+  theme: string;
+  entries: number;
+  open: boolean;
+}
+
+export function usePeek(): Peek {
   const [endsAt, setEndsAt] = useState<number | null>(null);
+  // The round account carries the theme and the entry count, so the home card
+  // costs the same one read as the header pill did.
+  const [theme, setTheme] = useState(() => themeFor(roundIdFor()));
+  const [entries, setEntries] = useState(0);
   const alive = useRef(true);
 
   useEffect(() => {
     alive.current = true;
     const read = () =>
       fetchRound(roundIdFor())
-        .then((r) => alive.current && setEndsAt(r ? Number(r.endsAt) : null))
+        .then((r) => {
+          if (!alive.current) return;
+          setEndsAt(r ? Number(r.endsAt) : null);
+          setEntries(r?.entryCount ?? 0);
+          if (r?.theme) setTheme(r.theme);
+        })
         .catch(() => {
-          /* offline or rate-limited — the pill just says "Arena" */
+          /* offline or rate-limited — the card falls back to the derived theme */
         });
     void read();
     const t = setInterval(read, 60_000);
@@ -29,7 +46,7 @@ export function usePeek(): { endsAt: number | null; open: boolean } {
     };
   }, []);
 
-  return { endsAt, open: endsAt !== null && endsAt * 1000 > Date.now() };
+  return { endsAt, theme, entries, open: endsAt !== null && endsAt * 1000 > Date.now() };
 }
 
 /** "3h 21m" / "47m" / null — minute resolution, because that is how often it ticks. */
