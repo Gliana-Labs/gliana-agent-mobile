@@ -27,6 +27,7 @@
  * rather than stopping dead.
  */
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
@@ -65,8 +66,18 @@ const OVERSCAN = 1.35;
 /** Art aspect, so the board keeps its proportions at any size. */
 const ART_RATIO = 900 / 1613;
 
-export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.ReactNode }) {
+export function MapBoard({
+  nodes,
+  hud,
+  footer,
+}: {
+  nodes: MapNode[];
+  /** In-world HUD across the top: the app's chrome, dressed as game furniture. */
+  hud?: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   // The board fills the width and overscans the height, so there is always
   // somewhere to drag to.
@@ -76,7 +87,9 @@ export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.R
   const maxY = Math.max(0, boardHeight - height);
 
   const x = useSharedValue(0);
-  const y = useSharedValue(-maxY * 0.15);
+  // Start at the top of the world: the arcade then sits clear of the HUD, and
+  // the gallery below the fold is a reason to drag.
+  const y = useSharedValue(0);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
 
@@ -144,12 +157,18 @@ export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.R
         <Animated.View style={[{ width: boardWidth, height: boardHeight, left: -(boardWidth - width) / 2 }, board]}>
           <Image source={require('../../assets/map-board.png')} style={StyleSheet.absoluteFill} contentFit="cover" />
 
-          {nodes.map((n) => (
-            // Visual only: the tap gesture above owns activation.
-            <View key={n.id} style={[styles.node, box(n), n.live && styles.nodeLive]} pointerEvents="none">
-              {n.live ? <View style={styles.dot} /> : null}
-            </View>
-          ))}
+          {nodes.map((n) => {
+            if (!n.live) return null;
+            const b = box(n);
+            // A quest pin above the door, which is how a game says "something is
+            // happening here". The border box it replaces read as a selection
+            // rectangle — an editor's idiom, not a world's.
+            return (
+              <View key={`${n.id}-pin`} style={[styles.pin, { left: b.left + b.width / 2 - 16, top: b.top - 30 }]} pointerEvents="none">
+                <Text style={styles.pinText}>!</Text>
+              </View>
+            );
+          })}
 
           {nodes.map((n) => {
             return (
@@ -166,10 +185,11 @@ export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.R
         </Animated.View>
       </GestureDetector>
 
-      {/* Chrome sits ABOVE the moving board, so the header and footer stay put
-          while the world slides under them. */}
+      {/* Chrome sits ABOVE the moving board, so the HUD stays put while the
+          world slides under it. */}
       <View style={styles.scrimTop} pointerEvents="none" />
       <View style={styles.scrimBottom} pointerEvents="none" />
+      {hud ? <View style={[styles.hud, { paddingTop: insets.top + space(2) }]}>{hud}</View> : null}
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </View>
   );
@@ -179,11 +199,29 @@ const styles = StyleSheet.create({
   board: { flex: 1, backgroundColor: colors.ink, overflow: 'hidden' },
   scrimTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 140, backgroundColor: 'rgba(10,10,13,0.55)' },
   scrimBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 230, backgroundColor: 'rgba(10,10,13,0.78)' },
+  hud: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    paddingHorizontal: space(3),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space(2),
+  },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: space(4), paddingBottom: space(8), gap: space(2) },
-  // Transparent over the building it covers: the art is the button's face.
-  node: { position: 'absolute', borderRadius: 4 },
-  nodeLive: { borderWidth: 2, borderColor: colors.flame, backgroundColor: 'rgba(245,158,11,0.10)' },
-  dot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, backgroundColor: colors.green },
+  pin: {
+    position: 'absolute',
+    width: 32,
+    height: 28,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.flameDeep,
+    backgroundColor: colors.flame,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinText: { color: colors.ink, fontSize: 11, fontFamily: font.pixel },
   labelWrap: { position: 'absolute', width: 180, alignItems: 'center' },
   // Hard shadows, so a label stays readable wherever the art is bright.
   label: {

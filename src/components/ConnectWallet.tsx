@@ -1,9 +1,14 @@
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text } from 'react-native';
 import { useWallet } from '../lib/mwa';
-import { colors, radius, space } from '../theme';
+import { colors, font, radius, space } from '../theme';
 import { WalletIcon } from './icons';
 
-export function ConnectWallet() {
+/**
+ * `pixel` restyles it for the map's HUD: square corners, 2px border, pixel
+ * type. Same behaviour — a wallet chip that looks like a game panel on the map
+ * and like a system control everywhere else.
+ */
+export function ConnectWallet({ pixel = false }: { pixel?: boolean } = {}) {
   const { account, connect, connecting, disconnect } = useWallet();
 
   async function onPress() {
@@ -29,13 +34,16 @@ export function ConnectWallet() {
   }
 
   return (
-    <Pressable onPress={onPress} style={[styles.btn, account ? styles.connected : styles.idle]}>
+    <Pressable
+      onPress={onPress}
+      style={[styles.btn, account ? styles.connected : styles.idle, pixel && styles.pixel]}
+    >
       {connecting ? (
         <ActivityIndicator size="small" color={colors.flameSoft} />
       ) : (
         <>
           <WalletIcon size={14} color={account ? colors.green : colors.flameSoft} />
-          <Text style={[styles.text, account ? styles.textConnected : styles.textIdle]}>
+          <Text style={[styles.text, account ? styles.textConnected : styles.textIdle, pixel && styles.pixelText]}>
             {account ? `${account.address.slice(0, 4)}…${account.address.slice(-4)}` : 'Connect'}
           </Text>
         </>
@@ -56,6 +64,8 @@ const styles = StyleSheet.create({
   },
   idle: { borderColor: 'rgba(245,158,11,0.4)', backgroundColor: 'rgba(245,158,11,0.08)' },
   connected: { borderColor: 'rgba(52,211,153,0.4)', backgroundColor: 'rgba(52,211,153,0.08)' },
+  pixel: { borderRadius: 4, borderWidth: 2, paddingVertical: space(2.5) },
+  pixelText: { fontSize: 9, fontFamily: font.pixel, fontWeight: '400' },
   text: { fontSize: 13, fontWeight: '600', fontFamily: 'monospace' },
   textIdle: { color: colors.flameSoft },
   textConnected: { color: colors.green },

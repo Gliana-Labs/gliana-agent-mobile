@@ -254,37 +254,24 @@ function Main() {
         }}
       />
 
+      {view === 'chat' ? (
       <View style={[styles.header, { paddingTop: insets.top + space(2) }]}>
         <View style={styles.headerLeft}>
-          <Pressable
-            onPress={() => (view === 'chat' ? setView('home') : setSidebarOpen(true))}
-            hitSlop={8}
-            style={styles.menuBtn}
-          >
-            {view === 'chat' ? (
-              <Text style={styles.backIcon}>‹</Text>
-            ) : (
-              <MenuIcon size={20} color={colors.textDim} />
-            )}
+          {/* Back to the map. The map is the home, so this header only ever
+              belongs to a conversation. */}
+          <Pressable onPress={() => setView('home')} hitSlop={8} style={styles.menuBtn}>
+            <Text style={styles.backIcon}>‹</Text>
           </Pressable>
           <Pressable onPress={() => setArenaOpen(true)} hitSlop={8} style={styles.arenaBtn}>
             <Text style={styles.arenaText}>◈ {timeLeft(peek.endsAt) ?? 'Arena'}</Text>
           </Pressable>
-          {view === 'chat' && active && messages.length > 0 ? (
+          {active && messages.length > 0 ? (
             <Text style={styles.headerTitle} numberOfLines={1}>
               {active.title}
-            </Text>
-          ) : view === 'home' ? (
-            // On Home the conversation title is not the subject — the app is.
-            <Text style={styles.wordmark}>
-              Gliana<Text style={styles.emptyAccent}>Agent</Text>
             </Text>
           ) : (
             <View style={styles.statusPill}>
               <View style={styles.statusDot} />
-              {/* Short, and allowed to shrink: with the Arena pill and Connect both in
-                  the header, the old "Agent online · pay per result" ran under the
-                  Connect button on a phone-width screen. */}
               <Text style={styles.statusText} numberOfLines={1}>
                 Online
               </Text>
@@ -293,6 +280,7 @@ function Main() {
         </View>
         <ConnectWallet />
       </View>
+      ) : null}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -304,6 +292,7 @@ function Main() {
             peek={peek}
             onArena={() => setArenaOpen(true)}
             onShowcase={() => setShowcaseOpen(true)}
+            onMenu={() => setSidebarOpen(true)}
             conversations={conversations}
             onOpenChat={(id) => {
               setActiveId(id);
@@ -386,6 +375,7 @@ function Home({
   peek,
   onArena,
   onShowcase,
+  onMenu,
   conversations,
   onOpenChat,
   onNewChat,
@@ -393,6 +383,7 @@ function Home({
   peek: Peek;
   onArena: () => void;
   onShowcase: () => void;
+  onMenu: () => void;
   conversations: Conversation[];
   onOpenChat: (id: string) => void;
   onNewChat: () => void;
@@ -403,6 +394,18 @@ function Home({
 
   return (
     <MapBoard
+      hud={
+        <>
+          <Pressable onPress={onMenu} style={styles.hudBtn} hitSlop={8}>
+            <Text style={styles.hudGlyph}>☰</Text>
+          </Pressable>
+          <View style={styles.hudClock}>
+            <Text style={styles.hudClockText}>◈ {left ?? '—'}</Text>
+          </View>
+          <View style={{ flex: 1 }} />
+          <ConnectWallet pixel />
+        </>
+      }
       nodes={[
         {
           id: 'arena',
@@ -437,18 +440,19 @@ function Home({
         },
       ]}
       footer={
-        <>
-          <Text style={styles.mapTheme} numberOfLines={2}>
-            TODAY: {peek.theme.toUpperCase()}
+        <View style={styles.quest}>
+          <Text style={styles.questLabel}>TODAY'S QUEST</Text>
+          <Text style={styles.questText} numberOfLines={2}>
+            {peek.theme}
           </Text>
           {last ? (
-            <Pressable style={styles.mapResume} onPress={() => onOpenChat(last.id)}>
-              <Text style={styles.mapResumeText} numberOfLines={1}>
-                ↩  {last.title}
+            <Pressable onPress={() => onOpenChat(last.id)} hitSlop={6}>
+              <Text style={styles.questResume} numberOfLines={1}>
+                ▸ resume · {last.title}
               </Text>
             </Pressable>
           ) : null}
-        </>
+        </View>
       }
     />
   );
@@ -580,24 +584,39 @@ const styles = StyleSheet.create({
   recentText: { color: colors.textDim, fontSize: 14 },
   backIcon: { color: colors.textDim, fontSize: 30, lineHeight: 30, marginTop: -4 },
   wordmark: { color: colors.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
-  mapTheme: {
-    color: colors.flameSoft,
-    fontSize: 9,
-    fontFamily: font.pixel,
-    letterSpacing: 1,
-    lineHeight: 16,
-    textAlign: 'center',
-  },
-  mapResume: {
-    marginTop: space(2),
-    paddingHorizontal: space(4),
-    paddingVertical: space(3),
+  // The HUD: the app's chrome dressed as game furniture. Square, 2px, pixel type.
+  hudBtn: {
+    width: 40,
+    height: 40,
     borderRadius: 4,
     borderWidth: 2,
     borderColor: colors.border,
-    backgroundColor: 'rgba(17,17,20,0.9)',
+    backgroundColor: 'rgba(17,17,20,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  mapResumeText: { color: colors.textDim, fontSize: 13 },
+  hudGlyph: { color: colors.textDim, fontSize: 16 },
+  hudClock: {
+    paddingHorizontal: space(3),
+    paddingVertical: space(2.5),
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: 'rgba(245,158,11,0.45)',
+    backgroundColor: 'rgba(17,17,20,0.92)',
+  },
+  hudClockText: { color: colors.flameSoft, fontSize: 9, fontFamily: font.pixel },
+  // A quest banner, not a toolbar.
+  quest: {
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: 'rgba(245,158,11,0.45)',
+    backgroundColor: 'rgba(11,11,14,0.92)',
+    padding: space(4),
+    gap: space(2),
+  },
+  questLabel: { color: colors.flameSoft, fontSize: 8, fontFamily: font.pixel, letterSpacing: 1.4 },
+  questText: { color: colors.text, fontSize: 12, fontFamily: font.pixel, lineHeight: 20 },
+  questResume: { color: colors.textDim, fontSize: 12, marginTop: space(1) },
   sectionLabel: {
     alignSelf: 'flex-start',
     color: colors.textDim,
