@@ -28,9 +28,16 @@ import { Press } from './arena/bits';
 export interface MapNode {
   id: string;
   label: string;
-  /** Position as a fraction of the board, 0–1. */
+  /** Position of the building's CENTRE, as a fraction of the board, 0–1. */
   x: number;
   y: number;
+  /**
+   * Hit area, as a fraction of board width/height. It should cover the building
+   * in the art: a small square floating above the label is a target nobody can
+   * find, which is exactly how these nodes shipped unclickable.
+   */
+  w?: number;
+  h?: number;
   /** One live line under the label, when the node has something to say. */
   status?: string;
   live?: boolean;
@@ -43,7 +50,8 @@ export interface MapNode {
  * portrait, and cover-cropping a landscape map throws away two of its three
  * destinations.
  */
-const NODE = 96;
+const NODE_W = 0.34;
+const NODE_H = 0.12;
 /** How much bigger than the viewport the board is drawn — the room to explore. */
 const OVERSCAN = 1.35;
 /** Art aspect, so the board keeps its proportions at any size. */
@@ -93,7 +101,12 @@ export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.R
     });
 
   const board = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }, { translateY: y.get() }] }));
-  const at = (n: MapNode) => ({ x: n.x * boardWidth, y: n.y * boardHeight });
+  const box = (n: MapNode) => {
+    const w = (n.w ?? NODE_W) * boardWidth;
+    const h = (n.h ?? NODE_H) * boardHeight;
+    return { left: n.x * boardWidth - w / 2, top: n.y * boardHeight - h / 2, width: w, height: h };
+  };
+  const labelTop = (n: MapNode) => n.y * boardHeight + ((n.h ?? NODE_H) * boardHeight) / 2 - 4;
 
   return (
     <View style={styles.board}>
@@ -101,26 +114,17 @@ export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.R
         <Animated.View style={[{ width: boardWidth, height: boardHeight, left: -(boardWidth - width) / 2 }, board]}>
           <Image source={require('../../assets/map-board.png')} style={StyleSheet.absoluteFill} contentFit="cover" />
 
-          {nodes.map((n) => {
-            const p = at(n);
-            return (
-              <Press
-                key={n.id}
-                onPress={n.onPress}
-                haptic="none"
-                style={[styles.node, { left: p.x - NODE / 2, top: p.y - NODE / 2 }, n.live && styles.nodeLive]}
-              >
-                {n.live ? <View style={styles.dot} /> : null}
-              </Press>
-            );
-          })}
+          {nodes.map((n) => (
+            <Press key={n.id} onPress={n.onPress} haptic="none" style={[styles.node, box(n), n.live && styles.nodeLive]}>
+              {n.live ? <View style={styles.dot} /> : null}
+            </Press>
+          ))}
 
           {nodes.map((n) => {
-            const p = at(n);
             return (
               <View
                 key={`${n.id}-label`}
-                style={[styles.labelWrap, { left: p.x - 90, top: p.y + NODE / 2 - 4 }]}
+                style={[styles.labelWrap, { left: n.x * boardWidth - 90, top: labelTop(n) }]}
                 pointerEvents="none"
               >
                 <Text style={styles.label}>{n.label}</Text>
@@ -146,7 +150,7 @@ const styles = StyleSheet.create({
   scrimBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 230, backgroundColor: 'rgba(10,10,13,0.78)' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: space(4), paddingBottom: space(8), gap: space(2) },
   // Transparent over the building it covers: the art is the button's face.
-  node: { position: 'absolute', width: NODE, height: NODE, borderRadius: 4 },
+  node: { position: 'absolute', borderRadius: 4 },
   nodeLive: { borderWidth: 2, borderColor: colors.flame, backgroundColor: 'rgba(245,158,11,0.10)' },
   dot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, backgroundColor: colors.green },
   labelWrap: { position: 'absolute', width: 180, alignItems: 'center' },
