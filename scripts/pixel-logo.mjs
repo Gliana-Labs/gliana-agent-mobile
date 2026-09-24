@@ -1,60 +1,47 @@
 /**
- * The pixel mark, placed by hand.
- *
- * Downscaling the vector logo produced an artifact, not pixel art: the
- * diagonals broke into unequal steps and the counter filled in. A pixel logo is
- * a drawing on a grid, so this is that drawing — the AG lockup at 30x18, one
- * colour, every pixel chosen. `#` is amber, `.` is empty.
- *
- * Keep the grid rectangular and let the renderer centre it: a mark squeezed
- * into a square grid to match the canvas is how letterforms get uneven stems.
+ * The pixel mark: the real logo, point-sampled.
  *
  *   node scripts/pixel-logo.mjs  →  assets/splash-icon-pixel.png
+ *
+ * Two earlier attempts were wrong in opposite directions. `-resize` to a small
+ * size antialiases, so the mark came back as a blurred small logo rather than
+ * pixel art. Redrawing the letters by hand read as pixel art but was no longer
+ * OUR mark — the brand is a triangular AG monogram, not an "AG" lockup.
+ *
+ * So: render the vector large, POINT-SAMPLE it down (nearest neighbour, no
+ * interpolation, hard pixels), remap to exactly two brand colours so no
+ * half-lit pixels survive, and blow it back up by whole pixels. The geometry is
+ * the original; only the resolution changed.
+ *
+ * 28 cells across: wide enough for the G's counter to survive, narrow enough
+ * that the diagonals still step visibly.
  */
-import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 
-const GRID = [
-  '..............................',
-  '..............................',
-  '.........##...................',
-  '.........##.......########....',
-  '........####.....##########...',
-  '........####....###......###..',
-  '.......##..##...###...........',
-  '.......##..##...##............',
-  '......##....##..##....#####...',
-  '......##....##..##....#####...',
-  '.....##......##.##.......###..',
-  '.....##########.###......###..',
-  '....###......###.##########...',
-  '....##........##..########....',
-  '...##..........##.............',
-  '...##..........##.............',
-  '..............................',
-  '..............................',
-];
-
+const CELLS = 28;
+const OUT = 'assets/splash-icon-pixel.png';
+const INK = '#0b0b0e';
 const AMBER = '#F59E0B';
-const BG = '#0b0b0e';
-// The grid is centred on a square canvas at whole-pixel scale — a fractional
-// cell size is exactly the blurring this whole file exists to avoid.
-const CELL = 32;
-const W = GRID[0].length * CELL;
-const H = GRID.length * CELL;
-const OFF_X = (1024 - W) / 2;
-const OFF_Y = (1024 - H) / 2;
 
-const rects = GRID.flatMap((row, y) =>
-  [...row].map((c, x) =>
-    c === '#'
-      ? `<rect x="${OFF_X + x * CELL}" y="${OFF_Y + y * CELL}" width="${CELL}" height="${CELL}" fill="${AMBER}"/>`
-      : '',
-  ),
-).join('');
+// A two-colour palette to remap against: without it the sampled pixels keep the
+// mid-tones the vector's antialiasing left behind, and a pixel logo with a
+// dozen shades of amber is just a small logo again.
+writeFileSync('/tmp/palette.txt', `# ImageMagick pixel enumeration: 2,1,255,srgb\n0,0: (${hex(INK)})\n1,0: (${hex(AMBER)})\n`);
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="${BG}"/>${rects}</svg>`;
+execFileSync('convert', [
+  '-background', INK,
+  'assets/icon-source-fullbleed.svg',
+  '-resize', '480x480',
+  '-sample', `${CELLS}x${CELLS}`,
+  '-remap', '/tmp/palette.txt',
+  '-sample', '1024x1024',
+  OUT,
+]);
 
-writeFileSync('/tmp/pixel-logo.svg', svg);
-execFileSync('convert', ['-background', 'none', '/tmp/pixel-logo.svg', 'assets/splash-icon-pixel.png']);
-console.log('wrote assets/splash-icon-pixel.png');
+console.log(`wrote ${OUT} (${CELLS}x${CELLS} cells, 2 colours)`);
+
+function hex(h) {
+  const n = parseInt(h.slice(1), 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}

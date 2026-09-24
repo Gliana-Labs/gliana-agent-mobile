@@ -65,6 +65,12 @@ export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.R
   const startY = useSharedValue(0);
 
   const pan = Gesture.Pan()
+    // Without a movement threshold the pan claims every touch the moment it
+    // lands, so the buildings stopped being tappable the day the map started
+    // moving. 8px is enough to tell a drag from a tap and small enough that a
+    // drag still feels immediate.
+    .activeOffsetX([-8, 8])
+    .activeOffsetY([-8, 8])
     .onBegin(() => {
       startX.set(x.get());
       startY.set(y.get());
