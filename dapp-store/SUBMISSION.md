@@ -6,7 +6,7 @@ Paste-ready values for the publisher portal. Assets referenced are in `./media/`
 |---|---|
 | dApp Name | `Gliana Agent` |
 | Package Name | `com.glianalabs.agent` |
-| Subtitle (50) | `90+ AI models and tools — pay per result` |
+| Subtitle (50) | `100+ AI models — pay per result, play daily` |
 | dApp Icon 512×512 | `media/icon-512.png` |
 | Banner 1200×600 | `media/banner-1200x600.png` |
 | Previews (4) | `media/screenshot-1.png` … `screenshot-4.png` (1080×2400) |

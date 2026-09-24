@@ -9,6 +9,39 @@ MPP `402`, the app builds the USDC transfer, your installed wallet (Phantom,
 Solflare, Backpack…) signs it, and the gateway broadcasts. No key ever leaves
 the wallet.
 
+## The Arena (SKR)
+
+A daily contest that runs on the same wallet the app already pays with. A theme
+drops each UTC day; you generate something in the chat (paid in USDC, as
+before), enter it for **SKR**, and everyone votes. The pot pays the winner 60%,
+places 2–5 25%, and the wallets that backed the winner *early* 15%.
+
+What is on-chain, in `program/arena` (Anchor):
+
+- The vault is a token account owned by the round PDA, so only the program can
+  move the pot — and only `claim_place` does.
+- `claim_place` is **permissionless** once the round ends: pots pay out even if
+  we stop running anything.
+- One vote per wallet per round (the Vote PDA's existence is the constraint),
+  and never for your own entry.
+- **Holding 100 SKR makes entry 20% cheaper**, read from the entrant's own
+  token account. A discount the client decides is not a discount.
+- A place must be *earned*: the round keeps a top-five leaderboard updated on
+  each vote, and a claim is checked against it.
+
+Rounds have no operator. The round id is the UTC day number and the theme comes
+from a fixed list indexed by it, so every client knows today's theme before the
+account exists — which is what lets the first player of the day create it.
+
+```bash
+npm test --prefix program/arena     # 16 LiteSVM tests, no validator
+npm run arena:smoke                 # drive the APP's client against devnet
+npm run arena:state                 # print today's round and its entries
+```
+
+Built for Solana Mobile's CLOCK IN hackathon. Plan and status:
+[docs/PLAN-SKR-ARENA.md](docs/PLAN-SKR-ARENA.md).
+
 ## Platform support
 
 - **Android** — full support (MWA is Android-only). Requires a Solana wallet app
