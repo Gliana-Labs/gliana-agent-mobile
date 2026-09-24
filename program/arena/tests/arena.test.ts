@@ -1,0 +1,299 @@
+/**
+ * Arena program tests, on LiteSVM — no validator, so the whole suite runs in
+ * about a second and can move the clock forward to end a round.
+ *
+ * What is actually being tested is the money: that the vault can only be moved
+ * by a real winner's claim, that a round cannot be voted twice by one wallet,
+ * and that nothing pays out twice. The happy path is the easy part.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
+import { LiteSVM, Clock } from 'litesvm';
+import { LiteSVMProvider } from 'anchor-litesvm';
+import { Program, BN, Wallet, type Idl } from '@coral-xyz/anchor';
+import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { AccountLayout, MintLayout, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { readFileSync } from 'node:fs';
+
+const idl = JSON.parse(readFileSync(new URL('../target/idl/arena.json', import.meta.url), 'utf8')) as Idl;
+const PROGRAM_ID = new PublicKey(idl.address);
+const SO = new URL('../target/deploy/arena.so', import.meta.url);
+
+/** SKR is 6-decimal, so these fees read like the real thing: 5 SKR. */
+const DECIMALS = 6;
+const FEE = new BN(5_000_000);
+const HOUR = 3600;
+
+let svm: LiteSVM;
+let provider: LiteSVMProvider;
+let program: Program;
+let payer: Keypair;
+let mint: PublicKey;
+let roundId: bigint;
+
+const fund = (kp: Keypair) => svm.airdrop(kp.publicKey, BigInt(10 * LAMPORTS_PER_SOL));
+
+/**
+ * Mint and token accounts are written straight into the SVM rather than created
+ * through @solana/spl-token: LiteSVMProvider's `connection` is a stub with no
+ * sendTransaction, so the library's helpers cannot run here. Writing the
+ * account bytes is also deterministic and instant.
+ */
+function putMint(authority: PublicKey) {
+  const key = Keypair.generate().publicKey;
+  const data = Buffer.alloc(MintLayout.span);
+  MintLayout.encode(
+    { mintAuthorityOption: 1, mintAuthority: authority, supply: 0n, decimals: DECIMALS, isInitialized: true, freezeAuthorityOption: 0, freezeAuthority: PublicKey.default },
+    data,
+  );
+  svm.setAccount(key, { lamports: 1_000_000_000, data, owner: TOKEN_PROGRAM_ID, executable: false });
+  return key;
+}
+
+function putTokenAccount(owner: PublicKey, amount: bigint) {
+  const key = Keypair.generate().publicKey;
+  const data = Buffer.alloc(AccountLayout.span);
+  AccountLayout.encode(
+    { mint, owner, amount, delegateOption: 0, delegate: PublicKey.default, delegatedAmount: 0n, state: 1, isNativeOption: 0, isNative: 0n, closeAuthorityOption: 0, closeAuthority: PublicKey.default },
+    data,
+  );
+  svm.setAccount(key, { lamports: 1_000_000_000, data, owner: TOKEN_PROGRAM_ID, executable: false });
+  return key;
+}
+
+/** SPL token balance straight out of the SVM. */
+function tokenBalance(ata: PublicKey): bigint {
+  const acc = svm.getAccount(ata);
+  if (!acc) throw new Error(`no token account ${ata.toBase58()}`);
+  return AccountLayout.decode(Buffer.from(acc.data)).amount;
+}
+
+function pda(seeds: (Buffer | Uint8Array)[]) {
+  return PublicKey.findProgramAddressSync(seeds, PROGRAM_ID)[0];
+}
+const u64 = (n: bigint) => {
+  const b = Buffer.alloc(8);
+  b.writeBigUInt64LE(n);
+  return b;
+};
+const roundPda = (id: bigint) => pda([Buffer.from('round'), u64(id)]);
+const vaultPda = (round: PublicKey) => pda([Buffer.from('vault'), round.toBuffer()]);
+const entryPda = (round: PublicKey, who: PublicKey) => pda([Buffer.from('entry'), round.toBuffer(), who.toBuffer()]);
+const votePda = (round: PublicKey, who: PublicKey) => pda([Buffer.from('vote'), round.toBuffer(), who.toBuffer()]);
+
+/** Move the SVM clock past a round's end so claims become valid. */
+function skipTo(unixTimestamp: number) {
+  const c = svm.getClock();
+  svm.setClock(new Clock(c.slot, c.epochStartTimestamp, c.epoch, c.leaderScheduleEpoch, BigInt(unixTimestamp)));
+}
+
+const now = () => Number(svm.getClock().unixTimestamp);
+
+function newEntrant(skr: bigint) {
+  const kp = Keypair.generate();
+  fund(kp);
+  return { kp, ata: putTokenAccount(kp.publicKey, skr) };
+}
+
+async function createRound(endsAt = now() + 24 * HOUR) {
+  roundId = BigInt(Math.floor(Math.random() * 1e9));
+  const round = roundPda(roundId);
+  await program.methods
+    .createRound(new BN(roundId.toString()), 'cursed street food', FEE, new BN(endsAt))
+    .accountsPartial({
+      authority: payer.publicKey,
+      round,
+      mint,
+      vault: vaultPda(round),
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .rpc();
+  return round;
+}
+
+async function enter(round: PublicKey, who: Keypair, ata: PublicKey, uri = 'https://r2.test/a.png') {
+  await program.methods
+    .enter(uri)
+    .accountsPartial({
+      entrant: who.publicKey,
+      round,
+      entry: entryPda(round, who.publicKey),
+      vault: vaultPda(round),
+      entrantTokens: ata,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .signers([who])
+    .rpc();
+}
+
+async function vote(round: PublicKey, voter: Keypair, entry: PublicKey) {
+  await program.methods
+    .vote()
+    .accountsPartial({ voter: voter.publicKey, round, entry, vote: votePda(round, voter.publicKey) })
+    .signers([voter])
+    .rpc();
+}
+
+async function claim(round: PublicKey, entry: PublicKey, winnerTokens: PublicKey, place: number) {
+  await program.methods
+    .claimPlace(place)
+    .accountsPartial({ round, entry, vault: vaultPda(round), winnerTokens, tokenProgram: TOKEN_PROGRAM_ID })
+    .rpc();
+}
+
+const balance = (ata: PublicKey) => tokenBalance(ata);
+
+beforeEach(async () => {
+  svm = new LiteSVM();
+  svm.addProgramFromFile(PROGRAM_ID, SO.pathname);
+  payer = Keypair.generate();
+  fund(payer);
+  // LiteSVMProvider wants an anchor Wallet, not a bare Keypair — it calls signTransaction.
+  provider = new LiteSVMProvider(svm, new Wallet(payer));
+  program = new Program(idl, provider as never);
+  mint = putMint(payer.publicKey);
+});
+
+describe('the round', () => {
+  it('takes the fee into a vault only the program can move', async () => {
+    const round = await createRound();
+    const a = newEntrant(20_000_000n);
+    await enter(round, a.kp, a.ata);
+
+    expect(balance(vaultPda(round))).toBe(BigInt(FEE.toString()));
+    expect(balance(a.ata)).toBe(15_000_000n);
+
+    // The owner is the round PDA, not us and not the entrant: nobody holds the pot.
+    const vault = AccountLayout.decode(Buffer.from(svm.getAccount(vaultPda(round))!.data));
+    expect(vault.owner.toBase58()).toBe(round.toBase58());
+  });
+
+  it('refuses an entry once the round has ended', async () => {
+    const endsAt = now() + HOUR;
+    const round = await createRound(endsAt);
+    const a = newEntrant(20_000_000n);
+    skipTo(endsAt + 1);
+    await expect(enter(round, a.kp, a.ata)).rejects.toThrow(/RoundClosed/);
+  });
+
+  it('refuses a second entry from the same wallet', async () => {
+    const round = await createRound();
+    const a = newEntrant(20_000_000n);
+    await enter(round, a.kp, a.ata);
+    // The Entry PDA is seeded on (round, wallet), so the second init fails.
+    await expect(enter(round, a.kp, a.ata)).rejects.toThrow();
+  });
+
+  it('refuses an entrant who cannot pay the fee', async () => {
+    const round = await createRound();
+    const broke = newEntrant(1_000_000n); // 1 SKR, fee is 5
+    await expect(enter(round, broke.kp, broke.ata)).rejects.toThrow();
+    expect(balance(vaultPda(round))).toBe(0n);
+  });
+});
+
+describe('voting', () => {
+  it('counts one vote per wallet and refuses a second', async () => {
+    const round = await createRound();
+    const a = newEntrant(20_000_000n);
+    await enter(round, a.kp, a.ata);
+    const voter = Keypair.generate();
+    fund(voter);
+
+    await vote(round, voter, entryPda(round, a.kp.publicKey));
+    expect((await program.account.entry.fetch(entryPda(round, a.kp.publicKey))).votes).toBe(1);
+
+    await expect(vote(round, voter, entryPda(round, a.kp.publicKey))).rejects.toThrow();
+  });
+
+  it('refuses a vote for your own entry', async () => {
+    const round = await createRound();
+    const a = newEntrant(20_000_000n);
+    await enter(round, a.kp, a.ata);
+    await expect(vote(round, a.kp, entryPda(round, a.kp.publicKey))).rejects.toThrow(/SelfVote/);
+  });
+
+  it('records how early the vote was', async () => {
+    const round = await createRound();
+    const a = newEntrant(20_000_000n);
+    await enter(round, a.kp, a.ata);
+    const first = Keypair.generate();
+    const second = Keypair.generate();
+    fund(first);
+    fund(second);
+    const entry = entryPda(round, a.kp.publicKey);
+    await vote(round, first, entry);
+    await vote(round, second, entry);
+
+    expect((await program.account.vote.fetch(votePda(round, first.publicKey))).rankAtVote).toBe(0);
+    expect((await program.account.vote.fetch(votePda(round, second.publicKey))).rankAtVote).toBe(1);
+  });
+});
+
+describe('payout', () => {
+  it('pays the winner 60% of the pot, once, and only after the round ends', async () => {
+    const endsAt = now() + HOUR;
+    const round = await createRound(endsAt);
+    const a = newEntrant(20_000_000n);
+    const b = newEntrant(20_000_000n);
+    await enter(round, a.kp, a.ata);
+    await enter(round, b.kp, b.ata);
+    const entryA = entryPda(round, a.kp.publicKey);
+
+    // Claiming before the end must fail, or a round could be drained early.
+    await expect(claim(round, entryA, a.ata, 1)).rejects.toThrow(/RoundOpen/);
+
+    skipTo(endsAt + 1);
+    // Same reason as below: the rejected claim above and this one would be the
+    // same bytes, and a duplicate is dropped before the program runs.
+    svm.expireBlockhash();
+    const pot = balance(vaultPda(round)); // 10 SKR
+    await claim(round, entryA, a.ata, 1);
+    expect(balance(a.ata)).toBe(15_000_000n + (pot * 6000n) / 10_000n);
+
+    // Paying twice is the failure that empties a vault. `paid` is the guard.
+    // The blockhash has to move first: an identical transaction is rejected as a
+    // duplicate before the program ever runs, which would pass this test for the
+    // wrong reason.
+    svm.expireBlockhash();
+    await expect(claim(round, entryA, a.ata, 1)).rejects.toThrow(/AlreadyPaid/);
+  });
+
+  it('refuses to pay a winner into someone else\'s token account', async () => {
+    const endsAt = now() + HOUR;
+    const round = await createRound(endsAt);
+    const a = newEntrant(20_000_000n);
+    const thief = newEntrant(0n);
+    await enter(round, a.kp, a.ata);
+    skipTo(endsAt + 1);
+
+    await expect(claim(round, entryPda(round, a.kp.publicKey), thief.ata, 1)).rejects.toThrow(
+      /WrongWinnerAccount/,
+    );
+    expect(balance(thief.ata)).toBe(0n);
+  });
+
+  it('refuses a place outside 1..5', async () => {
+    const endsAt = now() + HOUR;
+    const round = await createRound(endsAt);
+    const a = newEntrant(20_000_000n);
+    await enter(round, a.kp, a.ata);
+    skipTo(endsAt + 1);
+    await expect(claim(round, entryPda(round, a.kp.publicKey), a.ata, 6)).rejects.toThrow(/BadPlace/);
+  });
+
+  it('refuses an entry from a different round', async () => {
+    const endsAt = now() + HOUR;
+    const roundOne = await createRound(endsAt);
+    const a = newEntrant(40_000_000n);
+    await enter(roundOne, a.kp, a.ata);
+    const entryOne = entryPda(roundOne, a.kp.publicKey);
+
+    const roundTwo = await createRound(endsAt);
+    const b = newEntrant(20_000_000n);
+    await enter(roundTwo, b.kp, b.ata);
+    skipTo(endsAt + 1);
+
+    // Round two's pot must not pay round one's entry.
+    await expect(claim(roundTwo, entryOne, a.ata, 1)).rejects.toThrow();
+  });
+});

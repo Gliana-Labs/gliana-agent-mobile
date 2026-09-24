@@ -29,3 +29,16 @@ anchor test          # LiteSVM tests, no validator needed
 several transitive crates have since moved to edition2024 or raised their MSRV;
 each is pinned one version back. `cargo update` without `--precise` will break
 the build with "feature `edition2024` is required".
+
+## Tests
+
+`npm test` in this directory (vitest + LiteSVM, ~0.6s, no validator).
+
+Two harness notes that cost an hour each:
+
+- `anchor-litesvm` targets **litesvm 0.3** and web3.js. On litesvm 1.x every
+  address is a `@solana/kit` string and the provider blows up in `addProgramFromFile`.
+- LiteSVM drops a transaction whose bytes are identical to one it has already
+  seen, *before* the program runs. Any test that sends the same call twice —
+  rejected-then-accepted, or accepted-then-rejected — must `expireBlockhash()`
+  in between, or it passes for the wrong reason.
