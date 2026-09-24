@@ -20,7 +20,6 @@ import { Press } from './arena/bits';
 export interface MapNode {
   id: string;
   label: string;
-  glyph: string;
   /** Position as a fraction of the board, 0–1. */
   x: number;
   y: number;
@@ -30,23 +29,30 @@ export interface MapNode {
   onPress: () => void;
 }
 
-/** The art is 1100x614; the board keeps that ratio so buildings stay under nodes. */
-const RATIO = 1100 / 614;
-const NODE = 80;
+/**
+ * The board is the SCREEN, not a card on it: the art fills the viewport and the
+ * nodes sit on the buildings. Portrait art (900x1613) because a phone is
+ * portrait, and cover-cropping a landscape map throws away two of its three
+ * destinations.
+ */
+const NODE = 96;
 
-export function MapBoard({ nodes }: { nodes: MapNode[] }) {
-  const { width } = useWindowDimensions();
-  const boardWidth = width - space(5) * 2;
-  const boardHeight = boardWidth / RATIO;
-  const at = (n: MapNode) => ({ x: n.x * boardWidth, y: n.y * boardHeight });
+export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.ReactNode }) {
+  const { width, height } = useWindowDimensions();
+  const at = (n: MapNode) => ({ x: n.x * width, y: n.y * height });
 
   return (
-    <View style={[styles.board, { height: boardHeight }]}>
+    <View style={styles.board}>
       <Image
         source={require('../../assets/map-board.png')}
         style={StyleSheet.absoluteFill}
         contentFit="cover"
       />
+      {/* The art is bright in places and text has to survive all of them. A
+          scrim at the top and bottom keeps the header and the footer readable
+          without washing out the middle, where the map actually lives. */}
+      <View style={styles.scrimTop} pointerEvents="none" />
+      <View style={styles.scrimBottom} pointerEvents="none" />
 
       {nodes.map((n) => {
         const p = at(n);
@@ -67,7 +73,7 @@ export function MapBoard({ nodes }: { nodes: MapNode[] }) {
         return (
           <View
             key={`${n.id}-label`}
-            style={[styles.labelWrap, { left: p.x - 80, top: p.y + NODE / 2 - 2 }]}
+            style={[styles.labelWrap, { left: p.x - 90, top: p.y + NODE / 2 - 4 }]}
             pointerEvents="none"
           >
             <Text style={styles.label}>{n.label}</Text>
@@ -75,28 +81,26 @@ export function MapBoard({ nodes }: { nodes: MapNode[] }) {
           </View>
         );
       })}
+
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  board: {
-    marginTop: space(5),
-    marginBottom: space(4),
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
+  board: { flex: 1, backgroundColor: colors.ink },
+  scrimTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 140, backgroundColor: 'rgba(10,10,13,0.55)' },
+  scrimBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 230, backgroundColor: 'rgba(10,10,13,0.78)' },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: space(4), paddingBottom: space(8), gap: space(2) },
   // Transparent over the building it covers: the art is the button's face.
   node: { position: 'absolute', width: NODE, height: NODE, borderRadius: 4 },
   nodeLive: { borderWidth: 2, borderColor: colors.flame, backgroundColor: 'rgba(245,158,11,0.10)' },
   dot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, backgroundColor: colors.green },
-  labelWrap: { position: 'absolute', width: 160, alignItems: 'center' },
+  labelWrap: { position: 'absolute', width: 180, alignItems: 'center' },
   // Hard shadows, so a label stays readable wherever the art is bright.
   label: {
     color: colors.text,
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: font.pixel,
     letterSpacing: 1,
     textShadowColor: '#000',
