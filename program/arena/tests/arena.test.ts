@@ -238,6 +238,8 @@ describe('payout', () => {
     await enter(round, a.kp, a.ata);
     await enter(round, b.kp, b.ata);
     const entryA = entryPda(round, a.kp.publicKey);
+    // A place has to be EARNED — claim_place checks the leaderboard the votes built.
+    await vote(round, b.kp, entryA);
 
     // Claiming before the end must fail, or a round could be drained early.
     await expect(claim(round, entryA, a.ata, 1)).rejects.toThrow(/RoundOpen/);
@@ -264,6 +266,7 @@ describe('payout', () => {
     const a = newEntrant(20_000_000n);
     const thief = newEntrant(0n);
     await enter(round, a.kp, a.ata);
+    await vote(round, thief.kp, entryPda(round, a.kp.publicKey));
     skipTo(endsAt + 1);
 
     await expect(claim(round, entryPda(round, a.kp.publicKey), thief.ata, 1)).rejects.toThrow(
@@ -295,5 +298,54 @@ describe('payout', () => {
 
     // Round two's pot must not pay round one's entry.
     await expect(claim(roundTwo, entryOne, a.ata, 1)).rejects.toThrow();
+  });
+});
+
+describe('the leaderboard decides who gets paid', () => {
+  it('refuses a claim from an entry that won nothing', async () => {
+    const endsAt = now() + HOUR;
+    const round = await createRound(endsAt);
+    const a = newEntrant(20_000_000n);
+    const greedy = newEntrant(20_000_000n);
+    await enter(round, a.kp, a.ata);
+    await enter(round, greedy.kp, greedy.ata);
+    // `a` is the only entry anyone voted for.
+    await vote(round, greedy.kp, entryPda(round, a.kp.publicKey));
+    skipTo(endsAt + 1);
+
+    // Without the leaderboard check this is how the vault gets emptied: claim
+    // first place for your own entry, no votes required.
+    await expect(claim(round, entryPda(round, greedy.kp.publicKey), greedy.ata, 1)).rejects.toThrow(
+      /NotThisPlace/,
+    );
+    expect(balance(greedy.ata)).toBe(15_000_000n);
+  });
+
+  it('orders the top five by votes, and a tie keeps the earlier entry ahead', async () => {
+    const round = await createRound();
+    const a = newEntrant(20_000_000n);
+    const b = newEntrant(20_000_000n);
+    await enter(round, a.kp, a.ata);
+    await enter(round, b.kp, b.ata);
+    const entryA = entryPda(round, a.kp.publicKey);
+    const entryB = entryPda(round, b.kp.publicKey);
+
+    const voters = [0, 1, 2].map(() => {
+      const kp = Keypair.generate();
+      fund(kp);
+      return kp;
+    });
+    await vote(round, voters[0], entryB); // B leads with 1
+    await vote(round, voters[1], entryA); // A ties at 1 but arrived later
+    let top = (await program.account.round.fetch(round)).top as PublicKey[];
+    expect(top[0].toBase58()).toBe(entryB.toBase58());
+    expect(top[1].toBase58()).toBe(entryA.toBase58());
+
+    await vote(round, voters[2], entryA); // A takes the lead with 2
+    top = (await program.account.round.fetch(round)).top as PublicKey[];
+    expect(top[0].toBase58()).toBe(entryA.toBase58());
+    expect(top[1].toBase58()).toBe(entryB.toBase58());
+    // One entry, one place: a second vote must move it, not list it twice.
+    expect(top.filter((k) => k.toBase58() === entryA.toBase58())).toHaveLength(1);
   });
 });

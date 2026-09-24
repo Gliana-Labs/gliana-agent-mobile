@@ -33,6 +33,9 @@ const VOTERS_BPS: u64 = 1500;
 /// How many places share RUNNERS_BPS (2nd..=5th).
 const RUNNER_PLACES: usize = 4;
 
+/// Places the round tracks, and therefore pays: 1st plus RUNNER_PLACES.
+const TOP_N: usize = 1 + RUNNER_PLACES;
+
 /// Longest a round can run. A round that never ends is a vault that never pays.
 const MAX_ROUND_SECONDS: i64 = 7 * 24 * 60 * 60;
 
@@ -74,6 +77,8 @@ pub mod arena {
         round.entry_count = 0;
         round.settled = false;
         round.bump = ctx.bumps.round;
+        round.top = [Pubkey::default(); TOP_N];
+        round.top_votes = [0u32; TOP_N];
         Ok(())
     }
 
@@ -118,23 +123,29 @@ pub mod arena {
     /// `rank_at_vote` records how many votes the entry already had. That is what
     /// makes "early voters" meaningful at settle time without storing a list.
     pub fn vote(ctx: Context<CastVote>) -> Result<()> {
-        let round = &ctx.accounts.round;
-        require!(!round.settled, ArenaError::RoundSettled);
-        require!(Clock::get()?.unix_timestamp < round.ends_at, ArenaError::RoundClosed);
-        require_keys_eq!(ctx.accounts.entry.round, round.key(), ArenaError::WrongRound);
+        let round_key = ctx.accounts.round.key();
+        require!(!ctx.accounts.round.settled, ArenaError::RoundSettled);
+        require!(
+            Clock::get()?.unix_timestamp < ctx.accounts.round.ends_at,
+            ArenaError::RoundClosed
+        );
+        require_keys_eq!(ctx.accounts.entry.round, round_key, ArenaError::WrongRound);
         // Voting for your own entry is free money at settle time (you would take
         // a share of the voter pot for backing yourself), so it is refused.
         require_keys_neq!(ctx.accounts.entry.entrant, ctx.accounts.voter.key(), ArenaError::SelfVote);
 
         let entry = &mut ctx.accounts.entry;
         let v = &mut ctx.accounts.vote;
-        v.round = round.key();
+        v.round = round_key;
         v.voter = ctx.accounts.voter.key();
         v.entry = entry.key();
         v.rank_at_vote = entry.votes;
         v.bump = ctx.bumps.vote;
 
         entry.votes = entry.votes.checked_add(1).ok_or(ArenaError::Overflow)?;
+        let key = entry.key();
+        let votes = entry.votes;
+        record_rank(&mut ctx.accounts.round, key, votes);
         Ok(())
     }
 
@@ -151,7 +162,13 @@ pub mod arena {
         require!(Clock::get()?.unix_timestamp >= round.ends_at, ArenaError::RoundOpen);
         require_keys_eq!(ctx.accounts.entry.round, round.key(), ArenaError::WrongRound);
         require!(!ctx.accounts.entry.paid, ArenaError::AlreadyPaid);
-        require!(place >= 1 && place as usize <= 1 + RUNNER_PLACES, ArenaError::BadPlace);
+        require!(place >= 1 && place as usize <= TOP_N, ArenaError::BadPlace);
+        // The caller supplies the place; the votes decide whether it is true.
+        require_keys_eq!(
+            round.top[place as usize - 1],
+            ctx.accounts.entry.key(),
+            ArenaError::NotThisPlace
+        );
 
         let pot = ctx.accounts.vault.amount;
         let amount = match place {
@@ -237,7 +254,7 @@ pub struct Enter<'info> {
 pub struct CastVote<'info> {
     #[account(mut)]
     pub voter: Signer<'info>,
-    #[account(seeds = [b"round", round.round_id.to_le_bytes().as_ref()], bump = round.bump)]
+    #[account(mut, seeds = [b"round", round.round_id.to_le_bytes().as_ref()], bump = round.bump)]
     pub round: Account<'info, Round>,
     #[account(mut)]
     pub entry: Account<'info, Entry>,
@@ -283,12 +300,53 @@ pub struct Round {
     pub entry_count: u32,
     pub settled: bool,
     pub bump: u8,
+    /// The leaderboard, maintained on every vote.
+    ///
+    /// WHY IT LIVES HERE. `claim_place` takes the place from its caller, and
+    /// checking that claim needs to know who actually won. Ranking at claim
+    /// time would mean passing every entry in the round into one transaction,
+    /// which caps a round at whatever fits in 1232 bytes. Ranking at VOTE time
+    /// is five comparisons and bounds the cost per vote instead.
+    ///
+    /// Without this the program has a hole big enough to empty the vault:
+    /// anyone could claim place 1 for their own entry, no votes required.
+    pub top: [Pubkey; TOP_N],
+    pub top_votes: [u32; TOP_N],
 }
 
 impl Round {
     // 8 discriminator + 8 id + 32*3 keys + (4 + theme) + 8 fee + 8 ends_at
-    // + 4 count + 1 settled + 1 bump
-    pub const SPACE: usize = 8 + 8 + 32 * 3 + 4 + MAX_THEME_LEN + 8 + 8 + 4 + 1 + 1;
+    // + 4 count + 1 settled + 1 bump + top (32*5) + top_votes (4*5)
+    pub const SPACE: usize =
+        8 + 8 + 32 * 3 + 4 + MAX_THEME_LEN + 8 + 8 + 4 + 1 + 1 + 32 * TOP_N + 4 * TOP_N;
+}
+
+/// Insert an entry into the leaderboard after its vote count changed.
+///
+/// Strictly greater, so a tie keeps whoever got there first — an entry cannot
+/// take a place from one that reached the same count earlier.
+fn record_rank(round: &mut Round, entry: Pubkey, votes: u32) {
+    // Drop any place this entry already holds, so a second vote moves it up
+    // rather than listing it twice.
+    if let Some(i) = round.top.iter().position(|k| *k == entry) {
+        for j in i..TOP_N - 1 {
+            round.top[j] = round.top[j + 1];
+            round.top_votes[j] = round.top_votes[j + 1];
+        }
+        round.top[TOP_N - 1] = Pubkey::default();
+        round.top_votes[TOP_N - 1] = 0;
+    }
+    let Some(slot) = (0..TOP_N).find(|&i| votes > round.top_votes[i]) else {
+        return;
+    };
+    let mut i = TOP_N - 1;
+    while i > slot {
+        round.top[i] = round.top[i - 1];
+        round.top_votes[i] = round.top_votes[i - 1];
+        i -= 1;
+    }
+    round.top[slot] = entry;
+    round.top_votes[slot] = votes;
 }
 
 #[account]
@@ -351,6 +409,8 @@ pub enum ArenaError {
     BadPlace,
     #[msg("Nothing to pay")]
     NothingToPay,
+    #[msg("This entry did not take that place")]
+    NotThisPlace,
     #[msg("Payout account does not belong to the entrant")]
     WrongWinnerAccount,
     #[msg("Arithmetic overflow")]
