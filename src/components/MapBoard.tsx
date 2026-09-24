@@ -11,9 +11,17 @@
  *
  * Only the Arena node carries live state — a lit ring, a green dot, the
  * countdown — because it is the only place with a deadline.
+ *
+ * The board is BIGGER than the screen and you drag it around. A map you cannot
+ * move is a picture; the whole point of an overworld is that there is more of
+ * it than you can see. Panning runs on the UI thread through a shared value, so
+ * React never re-renders while your finger is down, and the edges rubber-band
+ * rather than stopping dead.
  */
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { colors, font, space } from '../theme';
 import { Press } from './arena/bits';
 
@@ -36,59 +44,98 @@ export interface MapNode {
  * destinations.
  */
 const NODE = 96;
+/** How much bigger than the viewport the board is drawn — the room to explore. */
+const OVERSCAN = 1.35;
+/** Art aspect, so the board keeps its proportions at any size. */
+const ART_RATIO = 900 / 1613;
 
 export function MapBoard({ nodes, footer }: { nodes: MapNode[]; footer?: React.ReactNode }) {
   const { width, height } = useWindowDimensions();
-  const at = (n: MapNode) => ({ x: n.x * width, y: n.y * height });
+
+  // The board fills the width and overscans the height, so there is always
+  // somewhere to drag to.
+  const boardWidth = Math.max(width, height * ART_RATIO) * OVERSCAN;
+  const boardHeight = boardWidth / ART_RATIO;
+  const maxX = Math.max(0, (boardWidth - width) / 2);
+  const maxY = Math.max(0, boardHeight - height);
+
+  const x = useSharedValue(0);
+  const y = useSharedValue(-maxY * 0.15);
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+
+  const pan = Gesture.Pan()
+    .onBegin(() => {
+      startX.set(x.get());
+      startY.set(y.get());
+    })
+    .onUpdate((e) => {
+      // Rubber band past the edge: a hard stop feels like a bug, and the
+      // resistance is what tells you the map has an edge at all.
+      const nx = startX.get() + e.translationX;
+      const ny = startY.get() + e.translationY;
+      x.set(nx > maxX ? maxX + (nx - maxX) * 0.25 : nx < -maxX ? -maxX + (nx + maxX) * 0.25 : nx);
+      y.set(ny > 0 ? ny * 0.25 : ny < -maxY ? -maxY + (ny + maxY) * 0.25 : ny);
+    })
+    .onEnd((e) => {
+      // Velocity carries into the spring, so a flick keeps travelling.
+      const settle = { duration: 500, dampingRatio: 0.9 } as const;
+      const restX = Math.min(maxX, Math.max(-maxX, x.get() + e.velocityX * 0.08));
+      const restY = Math.min(0, Math.max(-maxY, y.get() + e.velocityY * 0.08));
+      x.set(withSpring(restX, { ...settle, velocity: e.velocityX }));
+      y.set(withSpring(restY, { ...settle, velocity: e.velocityY }));
+    });
+
+  const board = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }, { translateY: y.get() }] }));
+  const at = (n: MapNode) => ({ x: n.x * boardWidth, y: n.y * boardHeight });
 
   return (
     <View style={styles.board}>
-      <Image
-        source={require('../../assets/map-board.png')}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-      />
-      {/* The art is bright in places and text has to survive all of them. A
-          scrim at the top and bottom keeps the header and the footer readable
-          without washing out the middle, where the map actually lives. */}
+      <GestureDetector gesture={pan}>
+        <Animated.View style={[{ width: boardWidth, height: boardHeight, left: -(boardWidth - width) / 2 }, board]}>
+          <Image source={require('../../assets/map-board.png')} style={StyleSheet.absoluteFill} contentFit="cover" />
+
+          {nodes.map((n) => {
+            const p = at(n);
+            return (
+              <Press
+                key={n.id}
+                onPress={n.onPress}
+                haptic="none"
+                style={[styles.node, { left: p.x - NODE / 2, top: p.y - NODE / 2 }, n.live && styles.nodeLive]}
+              >
+                {n.live ? <View style={styles.dot} /> : null}
+              </Press>
+            );
+          })}
+
+          {nodes.map((n) => {
+            const p = at(n);
+            return (
+              <View
+                key={`${n.id}-label`}
+                style={[styles.labelWrap, { left: p.x - 90, top: p.y + NODE / 2 - 4 }]}
+                pointerEvents="none"
+              >
+                <Text style={styles.label}>{n.label}</Text>
+                {n.status ? <Text style={styles.status}>{n.status}</Text> : null}
+              </View>
+            );
+          })}
+        </Animated.View>
+      </GestureDetector>
+
+      {/* Chrome sits ABOVE the moving board, so the header and footer stay put
+          while the world slides under them. */}
       <View style={styles.scrimTop} pointerEvents="none" />
       <View style={styles.scrimBottom} pointerEvents="none" />
-
-      {nodes.map((n) => {
-        const p = at(n);
-        return (
-          <Press
-            key={n.id}
-            onPress={n.onPress}
-            haptic="none"
-            style={[styles.node, { left: p.x - NODE / 2, top: p.y - NODE / 2 }, n.live && styles.nodeLive]}
-          >
-            {n.live ? <View style={styles.dot} /> : null}
-          </Press>
-        );
-      })}
-
-      {nodes.map((n) => {
-        const p = at(n);
-        return (
-          <View
-            key={`${n.id}-label`}
-            style={[styles.labelWrap, { left: p.x - 90, top: p.y + NODE / 2 - 4 }]}
-            pointerEvents="none"
-          >
-            <Text style={styles.label}>{n.label}</Text>
-            {n.status ? <Text style={styles.status}>{n.status}</Text> : null}
-          </View>
-        );
-      })}
-
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  board: { flex: 1, backgroundColor: colors.ink },
+  board: { flex: 1, backgroundColor: colors.ink, overflow: 'hidden' },
   scrimTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 140, backgroundColor: 'rgba(10,10,13,0.55)' },
   scrimBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 230, backgroundColor: 'rgba(10,10,13,0.78)' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: space(4), paddingBottom: space(8), gap: space(2) },
