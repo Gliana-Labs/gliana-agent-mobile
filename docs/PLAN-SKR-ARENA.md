@@ -100,6 +100,19 @@ Same rules as the gateway, for the same reasons:
 - Devnet uses a mock SKR mint (SKR is mainnet-only), selected by env, so a demo
   never needs real tokens.
 
+## Status
+
+| Piece | State |
+|---|---|
+| Anchor program | **built, 16 tests green, deployed to devnet** `2Cdzdz…4PPHQ` |
+| Kit client (Codama-generated) | **done**, `src/arena/generated` |
+| App client (reads, enter/vote/claim over MWA) | **done**, `src/arena/client.ts` |
+| SKR holder discount | **done** — on-chain, 20% off at 100 SKR |
+| Devnet fixtures | mock SKR mint `8799cf…GbRD`, round 20720 open |
+| Screens (Today / Gallery / Profile) | next |
+| Streaks, leaderboard | after screens |
+| Compressed-NFT prize | first thing cut if late |
+
 ## Timeline (13 days)
 
 | Days | Work | Cut line if late |

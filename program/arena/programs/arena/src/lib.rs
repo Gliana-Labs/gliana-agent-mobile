@@ -36,6 +36,16 @@ const RUNNER_PLACES: usize = 4;
 /// Places the round tracks, and therefore pays: 1st plus RUNNER_PLACES.
 const TOP_N: usize = 1 + RUNNER_PLACES;
 
+/// Hold this much SKR (base units — 6 decimals, so 100 SKR) and the entry fee
+/// drops to HOLDER_FEE_BPS of face value.
+///
+/// Checked against the entrant's OWN token account inside `enter`, because a
+/// perk the client decides is not a perk: anyone reading our source would take
+/// it. The balance is read after nothing but before the transfer, so the
+/// discount reflects what the wallet actually holds at that moment.
+const HOLDER_THRESHOLD: u64 = 100_000_000;
+const HOLDER_FEE_BPS: u64 = 8_000;
+
 /// Longest a round can run. A round that never ends is a vault that never pays.
 const MAX_ROUND_SECONDS: i64 = 7 * 24 * 60 * 60;
 
@@ -93,6 +103,15 @@ pub mod arena {
         require!(!round.settled, ArenaError::RoundSettled);
         require!(Clock::get()?.unix_timestamp < round.ends_at, ArenaError::RoundClosed);
 
+        // SKR holders pay less. The threshold is on the balance BEFORE the fee
+        // leaves, so an entrant sitting exactly on it keeps the discount.
+        let held = ctx.accounts.entrant_tokens.amount;
+        let fee = if held >= HOLDER_THRESHOLD {
+            round.entry_fee * HOLDER_FEE_BPS / 10_000
+        } else {
+            round.entry_fee
+        };
+
         token::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -102,7 +121,7 @@ pub mod arena {
                     authority: ctx.accounts.entrant.to_account_info(),
                 },
             ),
-            round.entry_fee,
+            fee,
         )?;
 
         let entry = &mut ctx.accounts.entry;
@@ -112,6 +131,7 @@ pub mod arena {
         entry.votes = 0;
         entry.created_at = Clock::get()?.unix_timestamp;
         entry.bump = ctx.bumps.entry;
+        entry.paid_fee = fee;
 
         round.entry_count = round.entry_count.checked_add(1).ok_or(ArenaError::Overflow)?;
         Ok(())
@@ -358,10 +378,13 @@ pub struct Entry {
     pub created_at: i64,
     pub paid: bool,
     pub bump: u8,
+    /// What this entrant actually paid — face value, or the holder rate. Stored
+    /// so the gallery can show it without re-deriving a discount it cannot see.
+    pub paid_fee: u64,
 }
 
 impl Entry {
-    pub const SPACE: usize = 8 + 32 + 32 + 4 + MAX_URI_LEN + 4 + 8 + 1 + 1;
+    pub const SPACE: usize = 8 + 32 + 32 + 4 + MAX_URI_LEN + 4 + 8 + 1 + 1 + 8;
 }
 
 #[account]

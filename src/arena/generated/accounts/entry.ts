@@ -29,6 +29,8 @@ import {
   getStructEncoder,
   getU32Decoder,
   getU32Encoder,
+  getU64Decoder,
+  getU64Encoder,
   getU8Decoder,
   getU8Encoder,
   getUtf8Decoder,
@@ -64,6 +66,11 @@ export type Entry = {
   createdAt: bigint;
   paid: boolean;
   bump: number;
+  /**
+   * What this entrant actually paid — face value, or the holder rate. Stored
+   * so the gallery can show it without re-deriving a discount it cannot see.
+   */
+  paidFee: bigint;
 };
 
 export type EntryArgs = {
@@ -74,6 +81,11 @@ export type EntryArgs = {
   createdAt: number | bigint;
   paid: boolean;
   bump: number;
+  /**
+   * What this entrant actually paid — face value, or the holder rate. Stored
+   * so the gallery can show it without re-deriving a discount it cannot see.
+   */
+  paidFee: number | bigint;
 };
 
 /** Gets the encoder for {@link EntryArgs} account data. */
@@ -88,6 +100,7 @@ export function getEntryEncoder(): Encoder<EntryArgs> {
       ["createdAt", getI64Encoder()],
       ["paid", getBooleanEncoder()],
       ["bump", getU8Encoder()],
+      ["paidFee", getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: ENTRY_DISCRIMINATOR }),
   );
@@ -104,6 +117,7 @@ export function getEntryDecoder(): Decoder<Entry> {
     ["createdAt", getI64Decoder()],
     ["paid", getBooleanDecoder()],
     ["bump", getU8Decoder()],
+    ["paidFee", getU64Decoder()],
   ]);
 }
 

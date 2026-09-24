@@ -1,0 +1,245 @@
+/**
+ * Arena client — reads rounds and entries, and sends the three instructions a
+ * player ever signs (`enter`, `vote`, and `claimPlace` when they win).
+ *
+ * Signing goes through MWA the same way payments do: hand the wallet the
+ * unsigned wire transaction and submit ITS signed bytes verbatim. Wallets
+ * re-serialize a transaction before signing, so a signature lifted out of their
+ * response does not verify over our bytes — that is the bug that broke paid
+ * generation on mobile (see lib/mwa.ts `signWireTransaction`). Same trap here.
+ */
+import {
+  address,
+  appendTransactionMessageInstructions,
+  compileTransaction,
+  createSolanaRpc,
+  createTransactionMessage,
+  getBase64EncodedWireTransaction,
+  getBase58Decoder,
+  getAddressEncoder,
+  getProgramDerivedAddress,
+  pipe,
+  setTransactionMessageFeePayer,
+  setTransactionMessageLifetimeUsingBlockhash,
+  type Address,
+  type Base58EncodedBytes,
+  type Instruction,
+} from '@solana/kit';
+import { Buffer } from 'buffer';
+import {
+  decodeEntry,
+  decodeRound,
+  getClaimPlaceInstruction,
+  getEnterInstruction,
+  getVoteInstruction,
+  getEntryDecoder,
+  getRoundDecoder,
+  findEntryPda,
+  findRoundPda,
+  findVaultPda,
+  findVotePda,
+  type Entry,
+  type Round,
+} from './generated';
+import {
+  ASSOCIATED_TOKEN_PROGRAM,
+  PROGRAM_ADDRESS,
+  RPC_URL,
+  SKR_MINT,
+  TOKEN_PROGRAM,
+  roundIdFor,
+} from './config';
+
+export type Rpc = ReturnType<typeof createSolanaRpc>;
+export const rpc: Rpc = createSolanaRpc(RPC_URL);
+
+/** What the wallet layer must provide: an address and a wire-transaction signer. */
+export interface WireSigner {
+  address: string;
+  signWireTransaction(unsignedWireB64: string): Promise<string>;
+}
+
+// ── addresses ──────────────────────────────────────────────────────────────
+
+export const roundAddress = (roundId: bigint) => findRoundPda({ roundId });
+export const entryAddress = (round: Address, entrant: Address) => findEntryPda({ round, entrant });
+export const voteAddress = (round: Address, voter: Address) => findVotePda({ round, voter });
+export const vaultAddress = (round: Address) => findVaultPda({ round });
+
+/**
+ * The associated token account for (owner, mint), derived by hand.
+ *
+ * Deriving it costs six lines; a package that does it would pull a Kit 8 client
+ * into a Kit 6 app for one PDA.
+ */
+export async function associatedTokenAddress(owner: Address, mint: Address = SKR_MINT): Promise<Address> {
+  const enc = getAddressEncoder();
+  const [ata] = await getProgramDerivedAddress({
+    programAddress: ASSOCIATED_TOKEN_PROGRAM,
+    seeds: [enc.encode(owner), enc.encode(TOKEN_PROGRAM), enc.encode(mint)],
+  });
+  return ata;
+}
+
+// ── reads ──────────────────────────────────────────────────────────────────
+
+/** Today's round, or null when nobody has opened it yet. */
+export async function fetchRound(roundId = roundIdFor()): Promise<Round | null> {
+  const [addr] = await roundAddress(roundId);
+  const { value } = await rpc.getAccountInfo(addr, { encoding: 'base64' }).send();
+  if (!value) return null;
+  return decodeRound({ address: addr, data: decodeBase64(value.data[0]), executable: false, exists: true, lamports: value.lamports, programAddress: address(value.owner), space: BigInt(value.space ?? 0) } as never).data;
+}
+
+export interface EntryWithAddress {
+  address: Address;
+  data: Entry;
+}
+
+/**
+ * Every entry in a round, in ONE `getProgramAccounts` call.
+ *
+ * A call per card would be a hundred RPC requests on a busy day and public
+ * endpoints rate-limit long before that. The filter is the Entry discriminator
+ * plus the round key at its fixed offset (8 discriminator).
+ */
+export async function fetchEntries(round: Address): Promise<EntryWithAddress[]> {
+  const { value: accounts } = await rpc
+    .getProgramAccounts(PROGRAM_ADDRESS, {
+      encoding: 'base64',
+      // withContext so the response is {context, value}; without it the shape
+      // differs between RPC providers.
+      withContext: true,
+      filters: [{ memcmp: { offset: 8n, bytes: round as unknown as Base58EncodedBytes, encoding: 'base58' } }],
+    })
+    .send();
+
+  const decoder = getEntryDecoder();
+  const out: EntryWithAddress[] = [];
+  for (const acc of accounts) {
+    const data = decodeBase64(acc.account.data[0]);
+    // An account whose discriminator is not Entry's decodes to nonsense, so the
+    // decode is attempted defensively: on-chain bytes are untrusted input.
+    try {
+      out.push({ address: acc.pubkey, data: decoder.decode(data) });
+    } catch {
+      /* not an Entry — skip */
+    }
+  }
+  return out.sort((a, b) => b.data.votes - a.data.votes || Number(a.data.createdAt - b.data.createdAt));
+}
+
+/** Has this wallet already voted in this round? The Vote PDA existing is the answer. */
+export async function hasVoted(round: Address, voter: Address): Promise<boolean> {
+  const [addr] = await voteAddress(round, voter);
+  const { value } = await rpc.getAccountInfo(addr, { encoding: 'base64' }).send();
+  return value !== null;
+}
+
+/** SKR balance in base units — 0 when the wallet holds none (no token account). */
+export async function skrBalance(owner: Address): Promise<bigint> {
+  const ata = await associatedTokenAddress(owner);
+  try {
+    const { value } = await rpc.getTokenAccountBalance(ata).send();
+    return BigInt(value.amount);
+  } catch {
+    return 0n;
+  }
+}
+
+// ── writes ─────────────────────────────────────────────────────────────────
+
+/**
+ * Build, sign through the wallet, and send. One wallet prompt per call: MWA
+ * shows a sheet per signing session, so two prompts for one tap reads as a bug.
+ */
+async function sendWithWallet(signer: WireSigner, instructions: Instruction[]): Promise<string> {
+  const payer = address(signer.address);
+  const { value: blockhash } = await rpc.getLatestBlockhash().send();
+
+  const message = pipe(
+    // v0, not v1: these transactions are far inside the 1232-byte limit and MWA
+    // wallets do not advertise v1 support yet. A wallet that cannot parse our
+    // transaction is a dead end, and there is nothing to gain here.
+    createTransactionMessage({ version: 0 }),
+    (m) => setTransactionMessageFeePayer(payer, m),
+    (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m),
+    (m) => appendTransactionMessageInstructions(instructions, m),
+  );
+
+  const unsigned = getBase64EncodedWireTransaction(compileTransaction(message));
+  const signedWire = await signer.signWireTransaction(unsigned);
+
+  // Send the wallet's own bytes. Re-encoding them here is exactly how the
+  // signature stops verifying.
+  const signature = await rpc
+    .sendTransaction(signedWire as never, { encoding: 'base64', preflightCommitment: 'confirmed' })
+    .send();
+  return signature;
+}
+
+/**
+ * Enter the round with a finished generation.
+ *
+ * Called only AFTER the generation succeeded and the user chose to enter it: a
+ * model that fails must never cost an entry fee.
+ */
+export async function enterRound(signer: WireSigner, roundId: bigint, mediaUri: string): Promise<string> {
+  const entrant = address(signer.address);
+  const [round] = await roundAddress(roundId);
+  const [entry] = await entryAddress(round, entrant);
+  const [vault] = await vaultAddress(round);
+  const entrantTokens = await associatedTokenAddress(entrant);
+
+  return sendWithWallet(signer, [
+    getEnterInstruction({
+      entrant: { address: entrant } as never,
+      round,
+      entry,
+      vault,
+      entrantTokens,
+      tokenProgram: TOKEN_PROGRAM,
+      mediaUri,
+    }) as Instruction,
+  ]);
+}
+
+/** Vote for someone else's entry. Free beyond the network fee. */
+export async function voteFor(signer: WireSigner, roundId: bigint, entry: Address): Promise<string> {
+  const voter = address(signer.address);
+  const [round] = await roundAddress(roundId);
+  const [vote] = await voteAddress(round, voter);
+
+  return sendWithWallet(signer, [
+    getVoteInstruction({ voter: { address: voter } as never, round, entry, vote }) as Instruction,
+  ]);
+}
+
+/**
+ * Claim a place after the round ends. Permissionless by design — anyone can
+ * push a winner's payout through, so a pot never waits on us.
+ */
+export async function claimPlace(
+  signer: WireSigner,
+  roundId: bigint,
+  entry: Address,
+  winner: Address,
+  place: number,
+): Promise<string> {
+  const [round] = await roundAddress(roundId);
+  const [vault] = await vaultAddress(round);
+  const winnerTokens = await associatedTokenAddress(winner);
+
+  return sendWithWallet(signer, [
+    getClaimPlaceInstruction({ round, entry, vault, winnerTokens, tokenProgram: TOKEN_PROGRAM, place }) as Instruction,
+  ]);
+}
+
+// ── helpers ────────────────────────────────────────────────────────────────
+
+const decodeBase64 = (b64: string) => new Uint8Array(Buffer.from(b64, 'base64'));
+
+/** Short form for display: `7xKX…mBvf`. */
+export const shortAddress = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+
+export { getBase58Decoder, decodeEntry };

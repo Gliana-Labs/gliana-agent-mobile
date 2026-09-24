@@ -349,3 +349,49 @@ describe('the leaderboard decides who gets paid', () => {
     expect(top.filter((k) => k.toBase58() === entryA.toBase58())).toHaveLength(1);
   });
 });
+
+describe('SKR holders pay less', () => {
+  it('charges 80% of the fee to a wallet holding 100 SKR or more', async () => {
+    const round = await createRound();
+    const holder = newEntrant(100_000_000n); // exactly the threshold
+    await enter(round, holder.kp, holder.ata);
+
+    const discounted = (BigInt(FEE.toString()) * 8_000n) / 10_000n;
+    expect(balance(vaultPda(round))).toBe(discounted);
+    expect(balance(holder.ata)).toBe(100_000_000n - discounted);
+    // The entry records what was actually paid, so the gallery need not guess.
+    expect((await program.account.entry.fetch(entryPda(round, holder.kp.publicKey))).paidFee.toString()).toBe(
+      discounted.toString(),
+    );
+  });
+
+  it('charges face value just below the threshold', async () => {
+    const round = await createRound();
+    const almost = newEntrant(99_999_999n);
+    await enter(round, almost.kp, almost.ata);
+    expect(balance(vaultPda(round))).toBe(BigInt(FEE.toString()));
+  });
+
+  it('cannot be claimed by a wallet that does not hold the tokens', async () => {
+    // The discount reads the entrant's OWN token account, which `enter` also
+    // debits — there is no second account a caller could point at instead.
+    const round = await createRound();
+    const poser = newEntrant(20_000_000n);
+    const rich = newEntrant(500_000_000n);
+    await expect(
+      program.methods
+        .enter('https://r2.test/a.png')
+        .accountsPartial({
+          entrant: poser.kp.publicKey,
+          round,
+          entry: entryPda(round, poser.kp.publicKey),
+          vault: vaultPda(round),
+          entrantTokens: rich.ata, // not theirs to spend
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([poser.kp])
+        .rpc(),
+    ).rejects.toThrow();
+    expect(balance(rich.ata)).toBe(500_000_000n);
+  });
+});
