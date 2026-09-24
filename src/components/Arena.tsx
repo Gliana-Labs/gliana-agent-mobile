@@ -286,6 +286,7 @@ function EntryCard({
 // ── You ────────────────────────────────────────────────────────────────────
 
 function You({ arena, address }: { arena: ReturnType<typeof useArena>; address: string | null }) {
+  const claimable = useMemo(() => arena.history.placings.filter((p) => p.claimable), [arena.history]);
   if (!address) return <Empty text="Connect a wallet to see your balance and perks." />;
 
   const toHolder = HOLDER_THRESHOLD - arena.held;
@@ -314,6 +315,43 @@ function You({ arena, address }: { arena: ReturnType<typeof useArena>; address: 
               <Text style={styles.perkOn}>Entry {skr(arena.fee)} SKR instead of 5</Text>
             )}
           </Card>
+
+          <Card>
+            <View style={styles.themeRow}>
+              <Stat label="Streak" value={arena.history.streak > 0 ? `${arena.history.streak}d` : '—'} />
+              <Stat label="Entered" value={String(arena.history.entered)} />
+              <Stat label="Wins" value={String(arena.history.wins)} />
+            </View>
+            <Text style={styles.cardBody}>
+              Counted from the chain, not this phone — reinstall it and your streak is still yours.
+            </Text>
+          </Card>
+
+          {claimable.length > 0 ? (
+            <Card>
+              <Text style={styles.cardTitle}>Winnings to claim</Text>
+              <Text style={styles.cardBody}>
+                Payouts are permissionless: this pushes yours through yourself.
+              </Text>
+              {claimable.map((p) => (
+                <View key={`${p.roundId}`} style={styles.claimRow}>
+                  <View>
+                    <Text style={styles.entryVotes}>
+                      {p.place === 1 ? 'Winner' : `Place ${p.place}`} · {p.votes} votes
+                    </Text>
+                    <Text style={styles.entryWho}>{dayLabel(p.roundId)}</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => void arena.claim(p)}
+                    disabled={arena.busy}
+                    style={styles.voteBtn}
+                  >
+                    <Text style={styles.voteText}>Claim</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </Card>
+          ) : null}
 
           <Card>
             <Text style={styles.cardTitle}>Today</Text>
@@ -374,6 +412,14 @@ function Action({
       {busy ? <ActivityIndicator color={colors.ink} size="small" /> : <Text style={styles.actionText}>{label}</Text>}
     </Pressable>
   );
+}
+
+/** "today", "yesterday", or the date — rounds are UTC days. */
+function dayLabel(roundId: bigint): string {
+  const today = BigInt(Math.floor(Date.now() / 86_400_000));
+  if (roundId === today) return 'today';
+  if (roundId === today - 1n) return 'yesterday';
+  return new Date(Number(roundId) * 86_400_000).toISOString().slice(0, 10);
 }
 
 /** Time left, ticking once a minute — a per-second countdown is a per-second re-render. */
@@ -468,6 +514,14 @@ const styles = StyleSheet.create({
   entryFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: space(2) },
   entryVotes: { color: colors.text, fontSize: 12, fontWeight: '600' },
   entryWho: { color: colors.textFaint, fontSize: 11, marginTop: 1 },
+  claimRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: space(2),
+    borderTopWidth: 1,
+    borderTopColor: colors.borderFaint,
+  },
   voteBtn: { backgroundColor: colors.flame, borderRadius: radius.pill, paddingHorizontal: space(3), paddingVertical: space(1) },
   voteText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
 

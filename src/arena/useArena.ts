@@ -8,8 +8,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { address, type Address } from '@solana/kit';
 import {
+  claimPlace,
   enterRound,
   fetchEntries,
+  fetchHistory,
   fetchRound,
   hasVoted,
   openRound,
@@ -29,6 +31,25 @@ export const HOLDER_FEE_BPS = 8_000n;
 export const feeFor = (held: bigint, faceValue: bigint = ENTRY_FEE): bigint =>
   held >= HOLDER_THRESHOLD ? (faceValue * HOLDER_FEE_BPS) / 10_000n : faceValue;
 
+/** A finished round this wallet placed in, and what is still owed. */
+export interface Placing {
+  roundId: bigint;
+  place: number;
+  entry: Address;
+  votes: number;
+  claimed: boolean;
+  /** Ended and still unclaimed — the only case with a button. */
+  claimable: boolean;
+}
+
+export interface History {
+  /** Consecutive days entered, counting back from today (or yesterday, if today is still open). */
+  streak: number;
+  entered: number;
+  wins: number;
+  placings: Placing[];
+}
+
 export interface ArenaState {
   roundId: bigint;
   theme: string;
@@ -44,10 +65,12 @@ export interface ArenaState {
   isHolder: boolean;
   pot: bigint;
   endsAt: number | null;
+  history: History;
   loading: boolean;
   busy: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  claim: (p: Placing) => Promise<void>;
   open: () => Promise<void>;
   enter: (mediaUri: string) => Promise<void>;
   vote: (entry: Address) => Promise<void>;
@@ -63,6 +86,7 @@ export function useArena(signer: WireSigner | null): ArenaState {
   const [entries, setEntries] = useState<EntryWithAddress[]>([]);
   const [voted, setVoted] = useState(false);
   const [held, setHeld] = useState(0n);
+  const [history, setHistory] = useState<History>({ streak: 0, entered: 0, wins: 0, placings: [] });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,10 +104,11 @@ export function useArena(signer: WireSigner | null): ArenaState {
       setError(null);
       if (signer) {
         const me = address(signer.address);
-        const [v, balance] = await Promise.all([hasVoted(addr, me), skrBalance(me)]);
+        const [v, balance, past] = await Promise.all([hasVoted(addr, me), skrBalance(me), fetchHistory(me)]);
         if (!alive.current) return;
         setVoted(v);
         setHeld(balance);
+        setHistory(summarise(past, roundId));
       }
     } catch (err) {
       if (alive.current) setError(readableError(err));
@@ -143,9 +168,49 @@ export function useArena(signer: WireSigner | null): ArenaState {
     busy,
     error,
     refresh,
+    history,
+    claim: (p: Placing) => act((s) => claimPlace(s, p.roundId, p.entry, address(s.address), p.place)),
     open: () => act((s) => openRound(s, roundId)),
     enter: (mediaUri: string) => act((s) => enterRound(s, roundId, mediaUri)),
     vote: (entry: Address) => act((s) => voteFor(s, roundId, entry)),
+  };
+}
+
+/**
+ * Turn the chain's version of this wallet's history into the three numbers the
+ * profile shows, plus what it can still claim.
+ */
+function summarise(
+  past: Awaited<ReturnType<typeof fetchHistory>>,
+  today: bigint,
+): History {
+  const now = Math.floor(Date.now() / 1000);
+  const placings: Placing[] = [];
+
+  for (const { entry, round } of past) {
+    const place = round.top.findIndex((k) => k === entry.address) + 1;
+    if (place === 0) continue;
+    placings.push({
+      roundId: round.roundId,
+      place,
+      entry: entry.address,
+      votes: entry.data.votes,
+      claimed: entry.data.paid,
+      claimable: !entry.data.paid && now >= Number(round.endsAt),
+    });
+  }
+
+  // A streak counts back from today, or from yesterday while today is still
+  // open — otherwise every streak would read as broken until you entered.
+  const days = new Set(past.map(({ round }) => round.roundId));
+  let streak = 0;
+  for (let day = days.has(today) ? today : today - 1n; days.has(day); day -= 1n) streak++;
+
+  return {
+    streak,
+    entered: past.length,
+    wins: placings.filter((p) => p.place === 1).length,
+    placings,
   };
 }
 

@@ -134,6 +134,59 @@ export async function fetchEntries(round: Address): Promise<EntryWithAddress[]> 
   return out.sort((a, b) => b.data.votes - a.data.votes || Number(a.data.createdAt - b.data.createdAt));
 }
 
+/**
+ * Every entry this wallet has ever made, newest round first, with the round it
+ * belongs to.
+ *
+ * Read from the CHAIN rather than from device storage: a streak kept in
+ * AsyncStorage is a number the device made up, lost on reinstall and trivially
+ * edited. The Entry layout puts `entrant` right after `round`, so one filtered
+ * getProgramAccounts finds them all.
+ */
+export async function fetchHistory(entrant: Address): Promise<{ entry: EntryWithAddress; round: Round; roundAddress: Address }[]> {
+  const { value: accounts } = await rpc
+    .getProgramAccounts(PROGRAM_ADDRESS, {
+      encoding: 'base64',
+      withContext: true,
+      // 8 discriminator + 32 round = 40.
+      filters: [{ memcmp: { offset: 40n, bytes: entrant as unknown as Base58EncodedBytes, encoding: 'base58' } }],
+    })
+    .send();
+
+  const decoder = getEntryDecoder();
+  const entries: EntryWithAddress[] = [];
+  for (const acc of accounts) {
+    try {
+      entries.push({ address: acc.pubkey, data: decoder.decode(decodeBase64(acc.account.data[0])) });
+    } catch {
+      /* not an Entry */
+    }
+  }
+  if (entries.length === 0) return [];
+
+  // One getMultipleAccounts for every round involved, not one per entry.
+  const roundKeys = [...new Set(entries.map((e) => e.data.round))];
+  const { value: roundAccounts } = await rpc.getMultipleAccounts(roundKeys, { encoding: 'base64' }).send();
+  const roundDecoder = getRoundDecoder();
+  const rounds = new Map<string, Round>();
+  roundKeys.forEach((key, i) => {
+    const acc = roundAccounts[i];
+    if (!acc) return;
+    try {
+      rounds.set(key, roundDecoder.decode(decodeBase64(acc.data[0])));
+    } catch {
+      /* not a Round */
+    }
+  });
+
+  return entries
+    .flatMap((entry) => {
+      const round = rounds.get(entry.data.round);
+      return round ? [{ entry, round, roundAddress: entry.data.round }] : [];
+    })
+    .sort((a, b) => Number(b.round.roundId - a.round.roundId));
+}
+
 /** Has this wallet already voted in this round? The Vote PDA existing is the answer. */
 export async function hasVoted(round: Address, voter: Address): Promise<boolean> {
   const [addr] = await voteAddress(round, voter);
