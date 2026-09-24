@@ -267,5 +267,9 @@ function readableError(err: unknown): string {
   if (/RoundClosed|RoundOpen/i.test(raw)) return 'The round has closed.';
   if (/declined|rejected|User rejected|cancell?ed/i.test(raw)) return 'Cancelled in the wallet.';
   if (/blockhash|Blockhash not found/i.test(raw)) return 'Network was busy — try that again.';
+  // -32002 is a preflight failure. It is usually a duplicate submission, which
+  // the confirm-by-signature path above already treats as success; anything
+  // reaching here genuinely did not land.
+  if (/-32002|preflight/i.test(raw)) return 'The network refused that transaction — nothing was charged.';
   return raw.length > 140 ? `${raw.slice(0, 140)}…` : raw;
 }

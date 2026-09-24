@@ -12,6 +12,9 @@ import {
   address,
   appendTransactionMessageInstructions,
   createNoopSigner,
+  getBase64Encoder,
+  getSignatureFromTransaction,
+  getTransactionDecoder,
   compileTransaction,
   createSolanaRpc,
   createTransactionMessage,
@@ -229,12 +232,50 @@ async function sendWithWallet(signer: WireSigner, instructions: Instruction[]): 
   const unsigned = getBase64EncodedWireTransaction(compileTransaction(message));
   const signedWire = await signer.signWireTransaction(unsigned);
 
-  // Send the wallet's own bytes. Re-encoding them here is exactly how the
-  // signature stops verifying.
-  const signature = await rpc
-    .sendTransaction(signedWire as never, { encoding: 'base64', preflightCommitment: 'confirmed' })
-    .send();
+  /**
+   * The signature is read from the wallet's OWN bytes before anything is sent,
+   * because the send is not the source of truth about whether this landed.
+   *
+   * Some wallets broadcast the transaction they just signed. Ours then arrives
+   * second and the RPC rejects it with -32002 "already been processed" — an
+   * error for a transaction that succeeded. The first real entry from a Seeker
+   * showed exactly that: the fee was paid, the entry was on-chain, and the app
+   * said it had failed.
+   *
+   * So: try to send, then ask the chain. A send error only matters if the
+   * signature never confirms.
+   */
+  const signed = getTransactionDecoder().decode(getBase64Encoder().encode(signedWire));
+  const signature = getSignatureFromTransaction(signed);
+
+  let sendError: unknown = null;
+  try {
+    // Send the wallet's own bytes. Re-encoding them here is exactly how the
+    // signature stops verifying.
+    await rpc.sendTransaction(signedWire as never, { encoding: 'base64', preflightCommitment: 'confirmed' }).send();
+  } catch (err) {
+    sendError = err;
+  }
+
+  const landed = await confirm(signature);
+  if (!landed) throw sendError ?? new Error('The transaction did not confirm — nothing was charged.');
   return signature;
+}
+
+/** Poll until the signature confirms, or give up. ~20s covers a devnet hiccup. */
+async function confirm(signature: string, attempts = 20): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const { value } = await rpc.getSignatureStatuses([signature as never]).send();
+      const status = value[0];
+      if (status?.err) return false;
+      if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') return true;
+    } catch {
+      /* transient RPC error — keep polling */
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return false;
 }
 
 /**
