@@ -11,6 +11,7 @@
 import {
   address,
   appendTransactionMessageInstructions,
+  createNoopSigner,
   compileTransaction,
   createSolanaRpc,
   createTransactionMessage,
@@ -251,7 +252,7 @@ export async function openRound(signer: WireSigner, roundId = roundIdFor()): Pro
 
   return sendWithWallet(signer, [
     getCreateRoundInstruction({
-      authority: { address: authority } as never,
+      authority: createNoopSigner(authority),
       round,
       mint: SKR_MINT,
       vault,
@@ -280,7 +281,10 @@ export async function enterRound(signer: WireSigner, roundId: bigint, mediaUri: 
 
   return sendWithWallet(signer, [
     getEnterInstruction({
-      entrant: { address: entrant } as never,
+      // A noop signer: the generated builder only needs to know this account
+      // signs, so it marks the account meta correctly. The signature itself
+      // comes from the wallet, over the whole wire transaction.
+      entrant: createNoopSigner(entrant),
       round,
       entry,
       vault,
@@ -298,7 +302,7 @@ export async function voteFor(signer: WireSigner, roundId: bigint, entry: Addres
   const [vote] = await voteAddress(round, voter);
 
   return sendWithWallet(signer, [
-    getVoteInstruction({ voter: { address: voter } as never, round, entry, vote }) as Instruction,
+    getVoteInstruction({ voter: createNoopSigner(voter), round, entry, vote }) as Instruction,
   ]);
 }
 

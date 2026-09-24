@@ -109,8 +109,10 @@ Same rules as the gateway, for the same reasons:
 | App client (reads, enter/vote/claim over MWA) | **done**, `src/arena/client.ts` |
 | SKR holder discount | **done** — on-chain, 20% off at 100 SKR |
 | Devnet fixtures | mock SKR mint `8799cf…GbRD`, round 20720 open |
-| Screens (Today / Gallery / Profile) | next |
-| Streaks, leaderboard | after screens |
+| Screens (Today / Gallery / Profile) | **done** |
+| Streaks, wins, claiming | **done** — read from the chain, not the device |
+| Devnet run through the app's own client | **enter + vote verified on-chain** (`npm run arena:smoke`) |
+| Run on a real device (MWA prompts) | next — needs a phone with test SKR |
 | Compressed-NFT prize | first thing cut if late |
 
 ## Timeline (13 days)
