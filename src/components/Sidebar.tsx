@@ -17,6 +17,7 @@ export function Sidebar({
   onSelect,
   onDelete,
   onShowcase,
+  onArena,
 }: {
   visible: boolean;
   conversations: Conversation[];
@@ -26,6 +27,7 @@ export function Sidebar({
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onShowcase: () => void;
+  onArena: () => void;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -66,6 +68,9 @@ export function Sidebar({
         </ScrollView>
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + space(3) }]}>
+          <Pressable style={styles.footerLink} onPress={onArena}>
+            <Text style={styles.footerText}>◈  Arena</Text>
+          </Pressable>
           <Pressable style={styles.footerLink} onPress={onShowcase}>
             <Text style={styles.footerText}>✦  Showcase</Text>
           </Pressable>

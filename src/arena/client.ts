@@ -30,6 +30,7 @@ import {
   decodeEntry,
   decodeRound,
   getClaimPlaceInstruction,
+  getCreateRoundInstruction,
   getEnterInstruction,
   getVoteInstruction,
   getEntryDecoder,
@@ -43,11 +44,15 @@ import {
 } from './generated';
 import {
   ASSOCIATED_TOKEN_PROGRAM,
+  ENTRY_FEE,
   PROGRAM_ADDRESS,
   RPC_URL,
   SKR_MINT,
+  SYSTEM_PROGRAM,
   TOKEN_PROGRAM,
+  roundEndsAt,
   roundIdFor,
+  themeFor,
 } from './config';
 
 export type Rpc = ReturnType<typeof createSolanaRpc>;
@@ -176,6 +181,35 @@ async function sendWithWallet(signer: WireSigner, instructions: Instruction[]): 
     .sendTransaction(signedWire as never, { encoding: 'base64', preflightCommitment: 'confirmed' })
     .send();
   return signature;
+}
+
+/**
+ * Open today's round — whoever gets there first.
+ *
+ * No cron, no server: the round account is created by the first player of the
+ * day, and the theme comes from the shared list so what they write is what
+ * everyone else already expects. They pay the account rent (a fraction of a
+ * cent) and nothing else; creating a round grants no privilege over it.
+ */
+export async function openRound(signer: WireSigner, roundId = roundIdFor()): Promise<string> {
+  const authority = address(signer.address);
+  const [round] = await roundAddress(roundId);
+  const [vault] = await vaultAddress(round);
+
+  return sendWithWallet(signer, [
+    getCreateRoundInstruction({
+      authority: { address: authority } as never,
+      round,
+      mint: SKR_MINT,
+      vault,
+      tokenProgram: TOKEN_PROGRAM,
+      systemProgram: SYSTEM_PROGRAM,
+      roundId,
+      theme: themeFor(roundId),
+      entryFee: ENTRY_FEE,
+      endsAt: BigInt(roundEndsAt(roundId)),
+    }) as Instruction,
+  ]);
 }
 
 /**

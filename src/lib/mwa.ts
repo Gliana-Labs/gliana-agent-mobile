@@ -49,13 +49,24 @@ function base64ToBase58(b64: string): string {
   return getBase58Decoder().decode(bytes);
 }
 
+/**
+ * A kit signer that can ALSO sign a raw wire transaction.
+ *
+ * Both paths exist because wallets re-serialize before signing: @solana/mpp
+ * wants a kit signer, while anything we submit ourselves must send the wallet's
+ * own bytes back verbatim or the signature does not verify.
+ */
+export type WalletSigner = TransactionPartialSigner & {
+  signWireTransaction(unsignedWireB64: string): Promise<string>;
+};
+
 interface WalletState {
   account: WalletAccount | null;
   connecting: boolean;
   connect: () => Promise<void>;
   disconnect: () => void;
-  /** kit signer for @solana/mpp — null until connected. */
-  signer: TransactionPartialSigner | null;
+  /** kit signer for @solana/mpp and the Arena — null until connected. */
+  signer: WalletSigner | null;
 }
 
 const Ctx = createContext<WalletState>({
@@ -104,7 +115,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   // A kit partial signer that routes signing through MWA. Rebuilt when the
   // connected account / auth token changes.
-  const signer = useMemo<TransactionPartialSigner | null>(() => {
+  const signer = useMemo<WalletSigner | null>(() => {
     if (!account || !authToken) return null;
     const addr = address(account.address);
     return {

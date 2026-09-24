@@ -21,6 +21,7 @@ import { Composer } from './src/components/Composer';
 import { MessageBubble } from './src/components/MessageBubble';
 import { Sidebar } from './src/components/Sidebar';
 import { Showcase } from './src/components/Showcase';
+import { Arena } from './src/components/Arena';
 import { ConnectWallet } from './src/components/ConnectWallet';
 import { MenuIcon } from './src/components/icons';
 import { Backdrop } from './src/components/Backdrop';
@@ -76,8 +77,23 @@ function Main() {
   const [typingId, setTypingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showcaseOpen, setShowcaseOpen] = useState(false);
+  const [arenaOpen, setArenaOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  /**
+   * Every finished generation on this device, newest first — what the Arena
+   * offers you to enter. Kept here because conversations live here; the Arena
+   * never generates anything itself.
+   */
+  const finishedResults = useMemo(
+    () =>
+      conversations
+        .flatMap((c) => c.messages.map((m) => m.result))
+        .filter((r): r is GenerationResult => Boolean(r?.url))
+        .reverse(),
+    [conversations],
+  );
 
   // Load persisted conversations on mount.
   useEffect(() => {
@@ -196,7 +212,13 @@ function Main() {
           setSidebarOpen(false);
           setShowcaseOpen(true);
         }}
+        onArena={() => {
+          setSidebarOpen(false);
+          setArenaOpen(true);
+        }}
       />
+
+      <Arena visible={arenaOpen} onClose={() => setArenaOpen(false)} results={finishedResults} />
 
       <Showcase
         visible={showcaseOpen}
@@ -211,6 +233,9 @@ function Main() {
         <View style={styles.headerLeft}>
           <Pressable onPress={() => setSidebarOpen(true)} hitSlop={8} style={styles.menuBtn}>
             <MenuIcon size={20} color={colors.textDim} />
+          </Pressable>
+          <Pressable onPress={() => setArenaOpen(true)} hitSlop={8} style={styles.arenaBtn}>
+            <Text style={styles.arenaText}>◈ Arena</Text>
           </Pressable>
           {active && messages.length > 0 ? (
             <Text style={styles.headerTitle} numberOfLines={1}>
@@ -271,7 +296,7 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
     <ScrollView contentContainerStyle={styles.empty} keyboardShouldPersistTaps="handled">
       <View style={styles.pill}>
         <View style={styles.pillDot} />
-        <Text style={styles.pillText}>90+ models · one prompt</Text>
+        <Text style={styles.pillText}>100+ models · one prompt</Text>
       </View>
       <Text style={styles.emptyTitle}>
         What should we <Text style={styles.emptyAccent}>make</Text>?
@@ -316,6 +341,15 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: space(3), flex: 1, minWidth: 0 },
   menuBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: colors.textDim, fontSize: 14, flex: 1 },
+  arenaBtn: {
+    paddingHorizontal: space(2.5),
+    paddingVertical: space(1.5),
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(245,158,11,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.3)',
+  },
+  arenaText: { color: colors.flameSoft, fontSize: 12, fontWeight: '700' },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: space(1.5) },
   statusDot: { width: 6, height: 6, borderRadius: 6, backgroundColor: colors.green },
   statusText: { color: colors.textFaint, fontSize: 12 },
