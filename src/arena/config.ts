@@ -1,9 +1,13 @@
 /**
  * Arena configuration — cluster, program, SKR mint, and what a round is.
  *
- * Devnet by default. SKR only exists on mainnet, so a devnet build points at a
- * mock mint (EXPO_PUBLIC_SKR_MINT) and the rest of the app does not care which
- * one it is talking to.
+ * MAINNET, on real SKR, since 2026-09-27 — program
+ * 2CdzdzR1hj6w1ZjXLgvk3o2Saq5sXd1ufQ3Toww4PPHQ, deployed with --max-len at the
+ * binary's exact size so the rent is 1.49 SOL rather than 2.99.
+ *
+ * A devnet build still works: point EXPO_PUBLIC_SOLANA_CLUSTER at devnet and
+ * EXPO_PUBLIC_SKR_MINT at the mock mint. SKR only exists on mainnet, and the
+ * rest of the app does not care which one it is talking to.
  */
 import { address, type Address } from '@solana/kit';
 import { ARENA_PROGRAM_ADDRESS } from './generated';
@@ -15,7 +19,7 @@ export const PROGRAM_ADDRESS = ARENA_PROGRAM_ADDRESS;
 export const SKR_MAINNET = 'SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3';
 export const SKR_DECIMALS = 6;
 
-export const CLUSTER = (process.env.EXPO_PUBLIC_SOLANA_CLUSTER ?? 'devnet') as 'devnet' | 'mainnet';
+export const CLUSTER = (process.env.EXPO_PUBLIC_SOLANA_CLUSTER ?? 'mainnet') as 'devnet' | 'mainnet';
 
 /**
  * The Arena's RPC — its OWN variable, deliberately not EXPO_PUBLIC_SOLANA_RPC.
@@ -29,8 +33,13 @@ export const RPC_URL =
   process.env.EXPO_PUBLIC_ARENA_RPC ??
   (CLUSTER === 'mainnet' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com');
 
+/**
+ * Both branches used to read SKR_MAINNET, so a devnet build with the env var
+ * unset silently looked for a mainnet mint on devnet and found nothing.
+ */
+export const SKR_DEVNET_MOCK = '8799cfUwjoqSEqQNhTmGsNdLLmWcwF5fnQEv97srGbRD';
 export const SKR_MINT: Address = address(
-  process.env.EXPO_PUBLIC_SKR_MINT ?? (CLUSTER === 'mainnet' ? SKR_MAINNET : SKR_MAINNET),
+  process.env.EXPO_PUBLIC_SKR_MINT ?? (CLUSTER === 'mainnet' ? SKR_MAINNET : SKR_DEVNET_MOCK),
 );
 
 export const TOKEN_PROGRAM = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
