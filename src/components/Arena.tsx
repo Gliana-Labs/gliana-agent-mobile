@@ -47,12 +47,15 @@ export function Arena({
   visible,
   onClose,
   results,
+  onSnap,
   onMake,
 }: {
   visible: boolean;
   onClose: () => void;
   /** Finished generations from this device's chats — what you can enter. */
   results: GenerationResult[];
+  /** Send the player to the camera — today's quest is a photo quest. */
+  onSnap: () => void;
   /** Seed the chat composer — how a player with nothing to enter gets started. */
   onMake: (prompt: string) => void;
 }) {
@@ -107,6 +110,7 @@ export function Arena({
           <Today
             arena={arena}
             results={results}
+            onSnap={onSnap}
             connected={connected}
             onConnect={connect}
             connecting={connecting}
@@ -130,6 +134,7 @@ export function Arena({
 function Today({
   arena,
   results,
+  onSnap,
   connected,
   onConnect,
   connecting,
@@ -137,6 +142,8 @@ function Today({
 }: {
   arena: ReturnType<typeof useArena>;
   results: GenerationResult[];
+  /** Send the player to the camera — today's quest is a photo quest. */
+  onSnap: () => void;
   connected: boolean;
   onConnect: () => Promise<void>;
   connecting: boolean;
@@ -190,12 +197,19 @@ function Today({
         // No disabled slab: the dead end becomes the loop. This seeds the chat
         // composer with today's theme — a text seed, not a charge.
         <Card>
-          <Text style={styles.title}>Make something for today</Text>
+          {/* The quest is a PHOTO quest: you shoot the theme, then restyle the
+              shot. It is the one thing a laptop cannot enter, and it means
+              every entry starts from something real that the player saw —
+              which is a better contest than who typed the better prompt. */}
+          <Text style={styles.title}>Shoot today's theme</Text>
           <Text style={styles.body}>
-            Generate an image in the chat — you pay for it as normal — then come back and enter it
-            for {skr(arena.fee)} SKR.
+            Photograph something for “{arena.theme}”, pick a look, and it becomes your entry.
+            You pay for the image as normal, then enter for {skr(arena.fee)} SKR.
           </Text>
-          <Action label={'Make one for "' + arena.theme + '"'} busy={false} onPress={() => onMake(`Make an image: ${arena.theme}, `)} />
+          <Action label="Open the camera" busy={false} onPress={onSnap} />
+          <Press onPress={() => onMake(`Make an image: ${arena.theme}, `)} haptic="none" style={styles.linkRow}>
+            <Text style={styles.link}>or describe it instead →</Text>
+          </Press>
         </Card>
       ) : (
         <Card>

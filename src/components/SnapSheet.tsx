@@ -14,12 +14,13 @@ import { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { colors, font, radius, space } from '../theme';
-import { SNAP_STYLES, type SnapStyle } from '../lib/snap';
+import { SNAP_STYLES, questStyle, type SnapStyle } from '../lib/snap';
 
 export function SnapSheet({
   photo,
   busy,
   error,
+  quest,
   onPick,
   onRetake,
   onClose,
@@ -27,6 +28,8 @@ export function SnapSheet({
   photo: string | null;
   busy: boolean;
   error: string | null;
+  /** Today's arena theme, when there is an open round. First and widest chip. */
+  quest?: string | null;
   onPick: (style: SnapStyle) => void;
   onRetake: () => void;
   onClose: () => void;
@@ -47,6 +50,24 @@ export function SnapSheet({
           {photo ? <Image source={{ uri: photo }} style={styles.shot} contentFit="cover" /> : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          {quest ? (
+            // The quest leads, because it is the only look with a deadline and
+            // the only one that can be entered for a prize.
+            <Pressable
+              disabled={busy}
+              onPress={() => {
+                setPicked('quest');
+                onPick(questStyle(quest));
+              }}
+              style={[styles.chip, styles.quest, picked === 'quest' && styles.chipOn, busy && picked !== 'quest' && styles.chipMuted]}
+            >
+              <Text style={[styles.chipLabel, picked === 'quest' && styles.chipLabelOn]}>TODAY'S QUEST</Text>
+              <Text style={styles.chipHint} numberOfLines={1}>
+                {quest}
+              </Text>
+            </Pressable>
+          ) : null}
 
           <View style={styles.grid}>
             {SNAP_STYLES.map((s) => {
@@ -112,6 +133,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   chipOn: { borderColor: colors.flame, backgroundColor: 'rgba(245,158,11,0.12)' },
+  quest: { width: '100%', borderColor: 'rgba(245,158,11,0.45)' },
   chipMuted: { opacity: 0.4 },
   chipLabel: { color: colors.text, fontSize: 9, fontFamily: font.pixel },
   chipLabelOn: { color: colors.flameSoft },

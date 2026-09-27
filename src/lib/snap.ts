@@ -117,3 +117,24 @@ export async function snapProposal(photoUrl: string, style: SnapStyle): Promise<
     quote: await quote(SNAP_MODEL, input),
   };
 }
+
+/**
+ * Today's theme as a look of its own.
+ *
+ * Built rather than listed, because the theme changes daily and it is the whole
+ * point of the arena: the entry should be YOUR photo bent toward the quest, not
+ * a generic render of the words. So the instruction keeps the subject and the
+ * framing and moves everything else.
+ */
+export function questStyle(theme: string): SnapStyle {
+  return {
+    id: 'quest',
+    label: "TODAY'S QUEST",
+    hint: theme,
+    prompt:
+      `Keep the main subject and composition of this photo exactly as they are, ` +
+      `and transform the scene around them to fit this theme: "${theme}". ` +
+      `Make it look like one coherent image, not a collage.`,
+  };
+}
+

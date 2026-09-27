@@ -22,6 +22,7 @@ import {
   type WireSigner,
 } from './client';
 import { ENTRY_FEE, roundIdFor, themeFor } from './config';
+import { offerQuestReminder } from '../lib/quest-reminder';
 import type { Round } from './generated';
 
 /** Hold this much SKR and the program charges 20% less — see the program's HOLDER_THRESHOLD. */
@@ -188,7 +189,16 @@ export function useArena(signer: WireSigner | null): ArenaState {
       : null,
     claim: (p: Placing) => act((s) => claimPlace(s, p.roundId, p.entry, address(s.address), p.place)),
     open: () => act((s) => openRound(s, roundId)),
-    enter: (mediaUri: string) => act((s) => enterRound(s, roundId, mediaUri)),
+    /**
+     * Entering is the moment to ask about the daily reminder: the player has
+     * just staked SKR on a round that ends tonight, so a nudge tomorrow is
+     * obviously useful. Asking on first launch, before anyone knows what the
+     * app does, is how you collect a permanent "no".
+     */
+    enter: (mediaUri: string) =>
+      act((s) => enterRound(s, roundId, mediaUri)).then(() => {
+        void offerQuestReminder();
+      }),
     vote: (entry: Address) => act((s) => voteFor(s, roundId, entry)),
   };
 }

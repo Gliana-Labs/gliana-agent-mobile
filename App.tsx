@@ -30,6 +30,7 @@ import { MenuIcon } from './src/components/icons';
 import { Backdrop } from './src/components/Backdrop';
 import type { Conversation, GenerationResult, Message, ProposalDraft } from './src/types';
 import { initSfx } from './src/lib/sfx';
+import { rescheduleQuestReminders } from './src/lib/quest-reminder';
 import { SnapSheet } from './src/components/SnapSheet';
 import { Viewfinder } from './src/components/Viewfinder';
 import { SnapError, snapProposal, uploadPhoto, type SnapStyle } from './src/lib/snap';
@@ -132,6 +133,9 @@ function Main() {
   // and the sound lands after the thing it punctuates.
   useEffect(() => {
     void initSfx();
+    // Keep the week's reminders pointing at the right themes. No-op until the
+    // player has granted notifications, which we only ask for after an entry.
+    void rescheduleQuestReminders();
   }, []);
 
   // Load persisted conversations on mount.
@@ -229,9 +233,14 @@ function Main() {
       setConversations((all) => [
         {
           id,
-          title: `Snap · ${style.label.toLowerCase()}`,
+          title: style.id === 'quest' ? `Quest · ${style.hint}` : `Snap · ${style.label.toLowerCase()}`,
           messages: [
-            { id: rid(), role: 'user' as const, text: `Make this ${style.hint}.`, attachment: url },
+            {
+              id: rid(),
+              role: 'user' as const,
+              text: style.id === 'quest' ? `Make this fit “${style.hint}”.` : `Make this ${style.hint}.`,
+              attachment: url,
+            },
             {
               id: rid(),
               role: 'agent' as const,
@@ -296,6 +305,7 @@ function Main() {
         photo={snapPhoto}
         busy={snapBusy}
         error={snapError}
+        quest={peek.open ? peek.theme : null}
         onPick={(style) => void pickSnapStyle(style)}
         onRetake={() => {
           setSnapPhoto(null);
@@ -336,6 +346,12 @@ function Main() {
         onClose={() => setArenaOpen(false)}
         results={finishedResults}
         onMake={(prompt) => void send(prompt)}
+        onSnap={() => {
+          // Leave the arena on the way to the camera: the sheet that follows a
+          // shot has to land on the chat, and two modals deep is a maze.
+          setArenaOpen(false);
+          startSnap();
+        }}
       />
 
       <Showcase
