@@ -145,6 +145,47 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [authToken]);
 
+  /**
+   * Start a signing session, repairing a dead authorization rather than failing.
+   *
+   * A stored auth token is a HANDLE the wallet can forget — it expires, the user
+   * revokes it, or (this one, repeatedly, today) the app is reinstalled. Before
+   * the session was persisted this barely mattered, because a token only ever
+   * existed moments after a successful authorize. Restoring one across restarts
+   * made the stale case ordinary, and it surfaced as the wallet's own words:
+   * "-1/authorization request failed", mid-payment, with no way forward.
+   *
+   * So a failed reauthorize falls back to a full authorize INSIDE the same
+   * session: one wallet round trip, no second prompt for the user, and the new
+   * token is kept. The only cost is that the wallet may ask them to approve the
+   * app again, which is exactly what a revoked authorization should do.
+   */
+  const authorizeIn = useCallback(
+    async (wallet: Parameters<Parameters<typeof transact>[0]>[0], token: string): Promise<string> => {
+      try {
+        const res = (await wallet.reauthorize({ auth_token: token, identity: APP_IDENTITY })) as
+          | { auth_token?: string }
+          | undefined;
+        // Wallets may rotate the token on reauthorize; keep whatever came back.
+        return res?.auth_token ?? token;
+      } catch {
+        const fresh = await wallet.authorize({ chain: CHAIN, identity: APP_IDENTITY });
+        return fresh.auth_token;
+      }
+    },
+    [],
+  );
+
+  /** Persist a token the wallet handed back, when it differs from the one we held. */
+  const rememberToken = useCallback(
+    (next: string) => {
+      if (!account || next === authToken) return;
+      setAuthToken(next);
+      void saveWallet({ address: account.address, label: account.label, authToken: next });
+    },
+    [account, authToken],
+  );
+
   // A kit partial signer that routes signing through MWA. Rebuilt when the
   // connected account / auth token changes.
   const signer = useMemo<WalletSigner | null>(() => {
@@ -157,10 +198,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       // re-serialize before signing, so a signature extracted from their bytes
       // does not verify over ours ("SignatureFailure" at the gateway).
       async signWireTransaction(unsignedWireB64: string): Promise<string> {
+        let issued = authToken;
         const { signed_payloads } = await transact(async (wallet) => {
-          await wallet.reauthorize({ auth_token: authToken, identity: APP_IDENTITY });
+          issued = await authorizeIn(wallet, authToken);
           return wallet.signTransactions({ payloads: [unsignedWireB64] });
         });
+        rememberToken(issued);
         if (!signed_payloads?.[0]) throw new Error('Wallet returned no signed transaction');
         return signed_payloads[0];
       },
@@ -168,11 +211,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         transactions: readonly Transaction[],
       ): Promise<readonly SignatureDictionary[]> {
         const payloads = transactions.map((tx) => getBase64EncodedWireTransaction(tx));
+        let issued = authToken;
         const { signed_payloads } = await transact(async (wallet) => {
-          // Reuse the existing authorization for this signing session.
-          await wallet.reauthorize({ auth_token: authToken, identity: APP_IDENTITY });
+          // Reuse the existing authorization, or repair it — see authorizeIn.
+          issued = await authorizeIn(wallet, authToken);
           return wallet.signTransactions({ payloads });
         });
+        rememberToken(issued);
         const decoder = getTransactionDecoder();
         return signed_payloads.map((b64: string) => {
           const bytes = new Uint8Array(Buffer.from(b64, 'base64'));
@@ -183,7 +228,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         });
       },
     };
-  }, [account, authToken]);
+  }, [account, authToken, authorizeIn, rememberToken]);
 
   const value = useMemo<WalletState>(
     () => ({ account, connecting, connect, disconnect, signer }),
