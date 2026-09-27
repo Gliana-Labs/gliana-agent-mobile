@@ -1,12 +1,30 @@
 /**
  * Renders editable input fields for a model, driven by the gateway's /v1/schema.
- * Controlled: parent owns `values` and gets `onChange(key, value)`. Mirrors the
- * web app's SchemaFields (text / number / enum / boolean), minus file uploads
- * (attachments are a follow-up on mobile).
+ * Controlled: parent owns `values` and gets `onChange(key, value)`.
+ *
+ * THE CARD IS A RECEIPT, NOT A CONTROL PANEL.
+ *
+ * Every field used to render expanded, so a krea-2 proposal was eight optional
+ * sliders deep — "K2 Complexity slider (-100 to 100). 0 disables the slider
+ * LoRA." and seven more — and the price and the Pay button sat three screens
+ * below the fold. The person asked for a picture of a paper crane; they were
+ * shown a provider's parameter dump.
+ *
+ * So: required fields are the card, and everything else lives behind one
+ * disclosure that says how many there are and how many you have changed. The
+ * defaults are good (the gateway fills them anyway), and a caller who wants
+ * `intensity` will go looking for it.
  */
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { colors, radius, space } from '../theme';
 import type { ModelSchema, PropSchema } from '../lib/api';
+
+/** `aspect_ratio` -> `Aspect ratio`. The API's name is not a label. */
+const labelFor = (name: string) => {
+  const s = name.replace(/[_-]+/g, ' ').trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
 
 export function SchemaFields({
   schema,
@@ -17,32 +35,57 @@ export function SchemaFields({
   values: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
 }) {
-  // Show required fields first, then the rest, skipping file refs.
-  const keys = Object.keys(schema.props).sort((a, b) => {
-    const ra = schema.required.includes(a) ? 0 : 1;
-    const rb = schema.required.includes(b) ? 0 : 1;
-    return ra - rb;
-  });
+  const [open, setOpen] = useState(false);
+
+  const { required, optional } = useMemo(() => {
+    const keep = (key: string) => {
+      const p = schema.props[key];
+      if (!p || p.fileRef) return false;
+      // billing-only fields (e.g. video-editing duration) are measured from the
+      // source video, not typed by the user — hide them.
+      return !/billing only|not sent/i.test(p.description ?? '');
+    };
+    const keys = Object.keys(schema.props).filter(keep);
+    return {
+      required: keys.filter((k) => schema.required.includes(k)),
+      optional: keys.filter((k) => !schema.required.includes(k)),
+    };
+  }, [schema]);
+
+  // "2 changed" is the reason to open the drawer — it tells you the agent (or
+  // you, earlier) put something in there that is not the default.
+  const changed = optional.filter((k) => {
+    const v = values[k];
+    return v !== undefined && v !== '' && v !== schema.props[k]?.default;
+  }).length;
+
+  const field = (key: string) => (
+    <Field
+      key={key}
+      name={key}
+      spec={schema.props[key]}
+      value={values[key]}
+      onChange={(v) => onChange(key, v)}
+    />
+  );
 
   return (
     <View style={{ gap: space(3) }}>
-      {keys.map((key) => {
-        const p = schema.props[key];
-        if (p.fileRef) return null;
-        // billing-only fields (e.g. video-editing duration) are measured from the
-        // source video, not typed by the user — hide them.
-        if (/billing only|not sent/i.test(p.description ?? '')) return null;
-        return (
-          <Field
-            key={key}
-            name={key}
-            spec={p}
-            required={schema.required.includes(key)}
-            value={values[key]}
-            onChange={(v) => onChange(key, v)}
-          />
-        );
-      })}
+      {required.map(field)}
+
+      {optional.length > 0 ? (
+        <View>
+          {/* The caret rides IN the label. Pushed to the far right it was a
+              stray amber speck with a screen's worth of gap before it. */}
+          <Pressable onPress={() => setOpen((v) => !v)} style={styles.disclosure} hitSlop={8}>
+            <Text style={styles.disclosureText}>
+              {open ? 'Hide' : 'Show'} {optional.length} option{optional.length === 1 ? '' : 's'}
+              {changed > 0 ? ` · ${changed} changed` : ''} {open ? '▴' : '▾'}
+            </Text>
+          </Pressable>
+          {open ? <View style={styles.optionals}>{optional.map(field)}</View> : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -50,26 +93,23 @@ export function SchemaFields({
 function Field({
   name,
   spec,
-  required,
   value,
   onChange,
 }: {
   name: string;
   spec: PropSchema;
-  required: boolean;
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
   const label = (
     <View style={styles.labelRow}>
-      <Text style={styles.label}>{name}</Text>
-      {required ? <Text style={styles.req}>required</Text> : <Text style={styles.opt}>optional</Text>}
+      <Text style={styles.label}>{labelFor(name)}</Text>
     </View>
   );
   // Persistent field description (the placeholder disappears once a value is
   // typed — mirror the web card and keep it visible below the input).
   const caption = spec.description ? (
-    <Text style={styles.caption} numberOfLines={3}>
+    <Text style={styles.caption} numberOfLines={2}>
       {spec.description}
     </Text>
   ) : null;
@@ -145,8 +185,7 @@ function Field({
   return (
     <View>
       <View style={styles.labelRow}>
-        <Text style={styles.label}>{name}</Text>
-        {required ? <Text style={styles.req}>required</Text> : <Text style={styles.opt}>optional</Text>}
+        <Text style={styles.label}>{labelFor(name)}</Text>
         {range && <Text style={styles.range}>{range}</Text>}
       </View>
       <TextInput
@@ -168,30 +207,20 @@ function Field({
 
 const styles = StyleSheet.create({
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: space(2), marginBottom: space(1.5) },
-  label: { color: colors.textDim, fontSize: 13, fontFamily: 'monospace' },
-  req: {
-    color: colors.red,
-    fontSize: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.3)',
-    backgroundColor: 'rgba(248,113,113,0.1)',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
+  label: { color: colors.text, fontSize: 13, fontWeight: '600' },
   range: { color: colors.textGhost, fontSize: 10, fontFamily: 'monospace' },
-  opt: {
-    color: colors.textGhost,
-    fontSize: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-    overflow: 'hidden',
+  // Was textGhost, which on this surface is barely a colour. A caption nobody
+  // can read is worse than no caption: it still takes the space.
+  caption: { color: colors.textDim, fontSize: 11, lineHeight: 15, marginTop: space(1.5) },
+  disclosure: { alignSelf: 'flex-start', paddingVertical: space(2) },
+  disclosureText: { color: colors.flameSoft, fontSize: 12 },
+  optionals: {
+    gap: space(3),
+    marginTop: space(2),
+    paddingTop: space(3),
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  caption: { color: colors.textGhost, fontSize: 11, lineHeight: 15, marginTop: space(1.5) },
   input: {
     backgroundColor: colors.surface,
     borderWidth: 1,

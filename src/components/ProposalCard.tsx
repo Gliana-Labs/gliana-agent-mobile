@@ -471,16 +471,19 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radius.lg,
     padding: space(4),
-    // Amber-tinted elevation — the priced card is the moment that matters, so give
-    // it real depth instead of sitting flat. Colored shadow (iOS) + elevation (Android).
-    shadowColor: colors.flame,
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    // The priced card is the moment that matters, so it is the amber one — but
+    // said with a BORDER, not a glow. `elevation: 8` plus a 20px amber shadow
+    // painted a halo that bled a finger's width past every edge on Android and
+    // made the card look out of focus. The rest of the app draws depth as a hard
+    // edge; this now agrees with it.
+    borderColor: 'rgba(245,158,11,0.35)',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: space(3) },
   cat: { color: colors.flameSoft, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
