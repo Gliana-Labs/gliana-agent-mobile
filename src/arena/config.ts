@@ -7,6 +7,7 @@
  */
 import { address, type Address } from '@solana/kit';
 import { ARENA_PROGRAM_ADDRESS } from './generated';
+import THEME_LIST from './themes.json';
 
 export const PROGRAM_ADDRESS = ARENA_PROGRAM_ADDRESS;
 
@@ -56,23 +57,14 @@ export const roundIdFor = (when: Date = new Date()): bigint =>
  * agree on what today's theme is BEFORE the account exists, or the opener
  * writes something nobody else expected. A list plus the day number does that
  * with no server, which is the same reason the round id is the day number.
+ *
+ * The list lives in themes.json rather than here because the round OPENER is a
+ * node script outside this bundle (program/arena/scripts/open-round.mjs) and it
+ * has to write the same string the app expects. Two copies of this list is one
+ * copy too many: a drifted entry means the app shows a theme nobody was
+ * generating for.
  */
-export const THEMES = [
-  'cursed street food',
-  'Bandar Lampung in 2090',
-  'a cat running a warung',
-  'the last ojek on earth',
-  'brutalist beach house',
-  'a saint of lost chargers',
-  'deep sea disco',
-  'instant noodles, renaissance painting',
-  'traffic jam on the moon',
-  'a durian that achieved enlightenment',
-  'rainy night, neon, 35mm',
-  'my landlord as a kaiju',
-  'sunrise over a scrapyard',
-  'a wedding in zero gravity',
-];
+export const THEMES: string[] = THEME_LIST;
 
 export const themeFor = (roundId: bigint): string => THEMES[Number(roundId % BigInt(THEMES.length))];
 

@@ -246,11 +246,8 @@ checksum = "ec9436d0ba1c4784fc040ee1e50e7d76f02399f3f976ba0c5b843ff9c17a6d35"
 dependencies = [
  "anchor-lang",
  "spl-associated-token-account",
- "spl-pod",
  "spl-token",
  "spl-token-2022",
- "spl-token-group-interface",
- "spl-token-metadata-interface",
 ]
 
 [[package]]

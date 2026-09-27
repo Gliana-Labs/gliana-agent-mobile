@@ -1,5 +1,8 @@
 /**
- * Open today's round on devnet.
+ * Open today's round.
+ *
+ * Network comes from RPC_URL + SKR_MINT, so the same script opens a devnet
+ * round against the mock mint and a mainnet round against real SKR.
  *
  * Rounds are a UTC day and their id is the day number, so any client can derive
  * today's address without asking anything. Someone still has to CREATE the
@@ -15,7 +18,14 @@ const { AnchorProvider, Program, Wallet, BN } = anchor;
 const RPC = process.env.RPC_URL ?? 'https://api.devnet.solana.com';
 const MINT = new PublicKey(process.env.SKR_MINT ?? readFileSync('/tmp/devnet-skr-mint.txt', 'utf8').trim());
 const FEE = BigInt(process.env.ENTRY_FEE ?? 5_000_000); // 5 SKR
-const THEME = process.env.THEME ?? 'cursed street food';
+/**
+ * Today's theme, from the SAME list the app derives it from — a hardcoded
+ * default here would open the round with a theme nobody in the app is
+ * generating for, and the theme is written into the account once, at creation.
+ */
+const THEMES = JSON.parse(readFileSync(new URL('../../../src/arena/themes.json', import.meta.url), 'utf8'));
+const todayId = Math.floor(Date.now() / 86_400_000);
+const THEME = process.env.THEME ?? THEMES[todayId % THEMES.length];
 
 const idl = JSON.parse(readFileSync(new URL('../target/idl/arena.json', import.meta.url), 'utf8'));
 const secret = JSON.parse(readFileSync(process.env.KEYPAIR ?? `${process.env.HOME}/.config/solana/id.json`, 'utf8'));

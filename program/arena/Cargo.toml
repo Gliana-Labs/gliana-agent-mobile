@@ -8,6 +8,11 @@ resolver = "2"
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
+# Size, because program rent is charged per byte and the loader reserves twice
+# the binary by default. Every kilobyte cut here is SOL that stays liquid.
+opt-level = "z"
+panic = "abort"
+strip = true
 [profile.release.build-override]
 opt-level = 3
 incremental = false

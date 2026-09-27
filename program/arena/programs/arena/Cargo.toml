@@ -22,7 +22,10 @@ custom-panic = []
 
 [dependencies]
 anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
-anchor-spl = "0.32.1"
+# default-features brings token-2022, metadata and more CPI surface we never
+# touch, and all of it lands in the binary — which is what program rent is
+# charged on. We use SPL Token and ATAs, nothing else.
+anchor-spl = { version = "0.32.1", default-features = false, features = ["token", "associated_token", "token_2022"] }
 
 
 [lints.rust]
