@@ -1,0 +1,12 @@
+{
+  "name": "Gliana Arena",
+  "project_url": "https://agent.glianalabs.com",
+  "contacts": "email:contact@glianalabs.com,link:https://github.com/Gliana-Labs/gliana-agent-mobile/issues",
+  "policy": "https://github.com/Gliana-Labs/gliana-agent-mobile/blob/master/program/arena/SECURITY.md",
+  "preferred_languages": "en,id",
+  "source_code": "https://github.com/Gliana-Labs/gliana-agent-mobile/tree/master/program/arena",
+  "source_release": "v1.1.0",
+  "encryption": "",
+  "auditors": "None. This program has not been audited.",
+  "acknowledgements": "Reported issues will be credited here."
+}
