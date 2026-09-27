@@ -25,7 +25,24 @@ export const SNAP_MODEL = 'flux-1-kontext-pro';
 const SNAP_FIELD = 'input_image';
 
 /**
- * Six looks, written as instructions to an editor rather than as prompts.
+ * Seven looks, written as instructions to an EDITOR, and in a deliberate order:
+ * what must STAY comes first, what changes comes second.
+ *
+ * This is not stylistic. flux-1-kontext-pro follows the first strong
+ * instruction it reads. "Transform this into a giant mecha, keep its colours"
+ * produced a stock robot in a stock room with nothing of the photograph left —
+ * the replacement instruction won and the hedge was ignored. Leading with
+ * "keep this exact photograph, same framing, same background" and describing
+ * the change as a modification OF THAT OBJECT keeps the subject in the frame.
+ *
+ * The opposite failure is just as easy: leading with a wall of "keep the same
+ * framing, background, lighting, colours" produced results indistinguishable
+ * from the input photo. Both extremes were tried on the same picture.
+ *
+ * What works is the middle, and the order is the trick: NAME THE CHANGE, then
+ * map it onto the object's own parts ("its panels become the torso, its fans
+ * become the eyes"), then pin the room last. The model needs something to build
+ * FROM; given that, it keeps the table, the curtain and the cable on the floor.
  *
  * Each one says what to KEEP as well as what to change: an edit model given
  * only a style ("make it 8-bit") will happily replace your subject with a
@@ -40,46 +57,77 @@ export interface SnapStyle {
 
 export const SNAP_STYLES: SnapStyle[] = [
   {
+    id: 'mecha',
+    label: 'MECHA',
+    hint: 'it transforms',
+    prompt:
+      'Turn the machine in this photo into a standing humanoid robot built FROM ' +
+      'that machine itself: its case panels become the torso and armour plates, ' +
+      'its fans and lights become the glowing chest vents and eyes, its cables ' +
+      'become cabling across the joints, and arms and legs unfold from its own ' +
+      'chassis. Keep its exact colour scheme and materials, and keep the same ' +
+      'room, same surface, same camera angle and same lighting.',
+  },
+
+  {
     id: 'pixel',
     label: 'PIXEL',
     hint: '8-bit sprite',
     prompt:
-      'Redraw this exact scene as 8-bit pixel art with a limited palette and hard pixel edges. Keep the same subject, composition and colours recognisable.',
+      'Redraw this exact photograph as 8-bit pixel art: chunky visible pixels, a ' +
+      'limited palette sampled from the photo\'s own colours, hard aliased edges, ' +
+      'flat shading. Keep the same framing, the same subject in the same position ' +
+      'and the same background layout, so it is clearly this photo as a game ' +
+      'sprite. Do not invent a different scene.',
   },
   {
     id: 'neon',
     label: 'NEON',
     hint: 'rainy night, 35mm',
     prompt:
-      'Relight this exact scene as a rainy neon night, wet reflections, shot on 35mm film. Keep the subject and composition; change only the light and atmosphere.',
+      'Keep this exact photograph: same framing, same subject, same background ' +
+      'geometry. Change only the light and the weather — rain, wet reflective ' +
+      'surfaces, coloured neon spill, deep shadows, grainy 35mm film. The subject ' +
+      'keeps its own colours and shape.',
   },
   {
     id: 'clay',
     label: 'CLAY',
     hint: 'stop-motion',
     prompt:
-      'Remake this exact scene as handmade claymation with visible fingerprints and soft studio light. Keep the subject and composition.',
+      'Remake this exact photograph as handmade claymation: every surface sculpted ' +
+      'plasticine with fingerprints and tool marks, soft studio light. Keep the ' +
+      'same framing, the same subject in the same position, the same background ' +
+      'layout and the same colours. Only the material changes.',
   },
   {
     id: 'ink',
     label: 'INK',
     hint: 'brush and paper',
     prompt:
-      'Redraw this exact scene as black brush ink on rough paper, bold strokes, no colour. Keep the subject and composition.',
+      'Redraw this exact photograph as bold black brush ink on rough paper: heavy ' +
+      'strokes, large areas of pure black and bare paper, no colour. Keep the same ' +
+      'framing, subject and composition so the drawing is recognisably this photo.',
   },
   {
     id: 'kaiju',
     label: 'KAIJU',
     hint: 'city-scale monster',
     prompt:
-      'Keep the main subject of this photo exactly as it is, but place it at city scale towering over a small town at dusk, in the style of a rubber-suit monster film.',
+      'Keep the main object of this photograph exactly as it is — same shape, same ' +
+      'colours, same markings — and keep the camera angle. Change only the scale ' +
+      'and the surroundings: the object now towers over a small town at dusk, with ' +
+      'tiny buildings, searchlights and smoke around its base.',
   },
   {
     id: 'poster',
     label: 'POSTER',
     hint: 'travel print',
     prompt:
-      'Turn this exact scene into a mid-century travel poster: flat shapes, three-colour print, grainy paper. Keep the subject and composition recognisable.',
+      'Turn this exact photograph into a mid-century travel poster: flat vector ' +
+      'shapes, a three-colour screen-print palette taken from the photo itself, ' +
+      'visible paper grain. Keep the same framing, the same subject in the same ' +
+      'position and the same background shapes.',
   },
 ];
 
@@ -132,9 +180,10 @@ export function questStyle(theme: string): SnapStyle {
     label: "TODAY'S QUEST",
     hint: theme,
     prompt:
-      `Keep the main subject and composition of this photo exactly as they are, ` +
-      `and transform the scene around them to fit this theme: "${theme}". ` +
-      `Make it look like one coherent image, not a collage.`,
+      `Transform this photo so it reads as "${theme}" at a glance, building that ` +
+      `scene OUT OF what was photographed: the same object stays the subject and ` +
+      `keeps its colours and materials, and the setting around it changes to suit ` +
+      `the theme. Keep the same camera angle. One coherent image, not a collage.`,
   };
 }
 
