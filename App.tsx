@@ -29,6 +29,7 @@ import { ConnectWallet } from './src/components/ConnectWallet';
 import { MenuIcon } from './src/components/icons';
 import { Backdrop } from './src/components/Backdrop';
 import type { Conversation, GenerationResult, Message, ProposalDraft } from './src/types';
+import { initSfx } from './src/lib/sfx';
 
 const STUB_REPLY =
   'The agent is not live yet. Soon: I pick the right model for what you described, quote the exact price, and you approve it with one tap.';
@@ -113,6 +114,12 @@ function Main() {
         .reverse(),
     [conversations],
   );
+
+  // Warm the blips once. Creating an AudioPlayer on the first tap costs a frame
+  // and the sound lands after the thing it punctuates.
+  useEffect(() => {
+    void initSfx();
+  }, []);
 
   // Load persisted conversations on mount.
   useEffect(() => {

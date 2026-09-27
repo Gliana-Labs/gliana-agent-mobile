@@ -28,6 +28,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, font, radius, space } from '../../theme';
+import { play } from '../../lib/sfx';
 
 /**
  * ARCADE STYLING, in three rules.
@@ -196,7 +197,11 @@ export function WinBanner({ place, children }: { place: number; children: React.
   const reduced = useReducedMotion();
 
   useEffect(() => {
+    // The banner IS the moment — it appears when a round you placed in has
+    // ended. The arpeggio fires here rather than on the claim tap, because the
+    // news is the delight and the claim is just paperwork.
     void tapSuccess();
+    play('win');
     opacity.set(withTiming(1, { duration: 220, easing: EASE_OUT }));
     scale.set(
       reduced

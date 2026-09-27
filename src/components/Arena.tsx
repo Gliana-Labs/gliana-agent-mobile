@@ -38,6 +38,7 @@ import { useArena, HOLDER_THRESHOLD, type Placing } from '../arena/useArena';
 import { shortAddress, type EntryWithAddress } from '../arena/client';
 import { CLUSTER, skr } from '../arena/config';
 import { Chip, Pot, Press, Rank, ThemeCard, WinBanner, tapSelect, PIXEL, px } from './arena/bits';
+import { isMuted, play, setMuted } from '../lib/sfx';
 import type { GenerationResult } from '../types';
 
 type Tab = 'today' | 'gallery' | 'you';
@@ -230,7 +231,7 @@ function Today({
             label={picked ? `Enter · ${skr(arena.fee)} SKR` : 'Pick an image'}
             busy={arena.busy}
             disabled={!connected || !picked}
-            onPress={() => picked && void arena.enter(picked)}
+            onPress={() => picked && void arena.enter(picked).then(() => play('enter'), () => play('nope'))}
           />
           {!connected ? <Connect onConnect={onConnect} connecting={connecting} /> : null}
         </Card>
@@ -260,7 +261,7 @@ function Result({ arena }: { arena: ReturnType<typeof useArena> }) {
           "{y.theme}" · {mine.votes} {mine.votes === 1 ? 'vote' : 'votes'}
         </Text>
         {mine.claimable ? (
-          <Action label="Claim your share" busy={arena.busy} onPress={() => void arena.claim(mine)} />
+          <Action label="Claim your share" busy={arena.busy} onPress={() => void arena.claim(mine).then(() => play('win'), () => play('nope'))} />
         ) : (
           <Chip text="Claimed" tone="green" />
         )}
@@ -333,7 +334,7 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
           mine={item.data.entrant === me}
           canVote={!arena.voted && item.data.entrant !== me}
           busy={arena.busy}
-          onVote={() => void arena.vote(item.address)}
+          onVote={() => void arena.vote(item.address).then(() => play('vote'), () => play('nope'))}
         />
       )}
     />
@@ -451,7 +452,7 @@ function You({
                   {dayLabel(p.roundId)} · {p.votes} {p.votes === 1 ? 'vote' : 'votes'}
                 </Text>
               </View>
-              <Press onPress={() => void arena.claim(p)} disabled={arena.busy} style={styles.voteBtn}>
+              <Press onPress={() => void arena.claim(p).then(() => play('win'), () => play('nope'))} disabled={arena.busy} style={styles.voteBtn}>
                 <Text style={styles.voteText}>Claim</Text>
               </Press>
             </View>
@@ -470,7 +471,36 @@ function You({
           {arena.isHolder ? ` · entry ${skr(arena.fee)} instead of 5` : ''}
         </Text>
       </Card>
+
+      <SoundRow />
     </Scroll>
+  );
+}
+
+/**
+ * The mute switch lives in the profile, not a settings screen nobody opens.
+ *
+ * Local state mirrors the module's, because the preference is read once at
+ * launch and a toggle has to repaint immediately — the sound itself is the
+ * confirmation when turning it back ON, which is why the blip fires there and
+ * not on the way off.
+ */
+function SoundRow() {
+  const [muted, setLocal] = useState(isMuted());
+  return (
+    <Press
+      haptic="none"
+      onPress={() => {
+        const next = !muted;
+        setLocal(next);
+        void setMuted(next);
+        if (!next) play('tap');
+      }}
+      style={styles.soundRow}
+    >
+      <Text style={styles.body}>Sound</Text>
+      <Text style={[styles.value, PIXEL, { fontSize: 10 }]}>{muted ? 'OFF' : 'ON'}</Text>
+    </Press>
   );
 }
 
@@ -710,4 +740,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(248,113,113,0.3)',
   },
   errorText: { color: colors.red, fontSize: 13 },
+  soundRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: space(5),
+    paddingVertical: space(4),
+  },
 });

@@ -33,6 +33,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { colors, font, space } from '../theme';
+import { play } from '../lib/sfx';
 
 export interface MapNode {
   id: string;
@@ -112,6 +113,9 @@ export function MapBoard({
       const node = hit(e.x, e.y);
       if (!node) return;
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // Travel is the one blip that fires often, so it is the quietest and the
+      // shortest — and it rides on a haptic that already confirmed the tap.
+      play('tap');
       node.onPress();
     });
 
