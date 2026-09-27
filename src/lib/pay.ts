@@ -66,10 +66,18 @@ function guessContentType(url: string, key: string): string {
   return key === 'audio' ? 'audio/mpeg' : key === 'video' ? 'video/mp4' : 'image/png';
 }
 
+/**
+ * What the wallet is asked to transfer. USDC is the default rail; SKR is the
+ * same Solana rail with a different mint, chosen per request by a header the
+ * gateway reads (see lib/skr.ts there).
+ */
+export type PayCurrency = 'USDC' | 'SKR';
+
 export async function payAndRun(
   signer: TransactionPartialSigner,
   body: Record<string, unknown>,
   endpoint = '/v1/infer',
+  currency: PayCurrency = 'USDC',
 ): Promise<InferResult> {
   // SINGLE attempt — never auto-retry. The gateway BROADCASTS the signed Solana
   // tx, so a second attempt broadcasts a SECOND transaction and the wallet pays
@@ -78,7 +86,7 @@ export async function payAndRun(
   // retry deliberately (fresh blockhash), never a silent double-pay.
   let res: Response;
   try {
-    res = await attempt(signer, body, endpoint);
+    res = await attempt(signer, body, endpoint, currency);
   } catch (e) {
     // Android drops the app's network for a beat when switching back from the
     // wallet app — surfaces as UnknownHostException / "Network request failed".
@@ -92,7 +100,9 @@ export async function payAndRun(
   }
 
   if (res.status === 402) {
-    throw new Error('Payment did not settle — check the wallet holds USDC on Solana, then tap Approve again.');
+    throw new Error(
+      `Payment did not settle — check the wallet holds ${currency} on Solana, then tap Approve again.`,
+    );
   }
   if (res.status === 400) {
     const e = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
@@ -105,7 +115,12 @@ export async function payAndRun(
   return (await res.json()) as InferResult;
 }
 
-function attempt(signer: TransactionPartialSigner, body: Record<string, unknown>, endpoint: string): Promise<Response> {
+function attempt(
+  signer: TransactionPartialSigner,
+  body: Record<string, unknown>,
+  endpoint: string,
+  currency: PayCurrency,
+): Promise<Response> {
   // Fresh client per attempt so a stale challenge is never reused.
   const mppx = Mppx.create({
     methods: [solana.charge({ signer: signer as never, ...(SOLANA_RPC ? { rpcUrl: SOLANA_RPC } : {}) })] as never,
@@ -113,7 +128,13 @@ function attempt(signer: TransactionPartialSigner, body: Record<string, unknown>
   });
   return mppx.fetch(`${API}${endpoint}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    // The gateway swaps the Solana rail's mint when it sees this; without it
+    // the challenge is USDC exactly as before. @solana/mpp needs no change —
+    // it resolves an unrecognised currency string as a mint address.
+    headers: {
+      'content-type': 'application/json',
+      ...(currency === 'SKR' ? { 'x-pay-currency': 'SKR' } : {}),
+    },
     body: JSON.stringify(body),
   });
 }

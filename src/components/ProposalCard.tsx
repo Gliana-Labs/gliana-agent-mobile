@@ -8,7 +8,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useVideoPlayer } from 'expo-video';
 import { fetchSchema, quote, usd, type ModelSchema, type Proposal, type Quote } from '../lib/api';
-import { payAndRun } from '../lib/pay';
+import { payAndRun, type PayCurrency } from '../lib/pay';
+import { skrEstimate, skrUsd } from '../lib/skr-price';
 import { useWallet } from '../lib/mwa';
 import { colors, radius, space } from '../theme';
 import { SchemaFields } from './SchemaFields';
@@ -62,6 +63,12 @@ export function ProposalCard({
   const { account, connect, connecting, signer } = useWallet();
   const [model, setModel] = useState(draft?.model ?? proposal.model);
   const [pickerOpen, setPickerOpen] = useState(false);
+  /**
+   * Which token pays. USDC is the default on purpose: SKR is the user's game
+   * token and spending it should be a choice they make, not one they discover.
+   */
+  const [currency, setCurrency] = useState<PayCurrency>('USDC');
+  const [skrRate, setSkrRate] = useState<number | null>(null);
   const [schema, setSchema] = useState<ModelSchema | null>(null);
   const [values, setValues] = useState<Record<string, unknown>>(() => ({
     ...proposal.input,
@@ -203,6 +210,18 @@ export function ProposalCard({
     [schema, values, attach],
   );
 
+  // Read the pool price once, so the button can name the SKR amount before the
+  // wallet opens rather than after.
+  useEffect(() => {
+    let alive = true;
+    void skrUsd().then((v) => alive && setSkrRate(v));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const skrAmount = skrRate && q ? skrEstimate(q.costMicroUsd, skrRate) : null;
+
   async function pay() {
     if (!signer) {
       await connect().catch((e) => setError(humanError(e)));
@@ -211,7 +230,7 @@ export function ProposalCard({
     setStatus('paying');
     setError(null);
     try {
-      const res = await payAndRun(signer, body, proposal.endpoint ?? '/v1/infer');
+      const res = await payAndRun(signer, body, proposal.endpoint ?? '/v1/infer', currency);
       // Models nest the payload under `output`; tools/recipes return url/markdown/…
       // at the top level — feed the whole response in as the output to render from.
       const media = asResult(isModel ? res : { costMicroUsd: res.costMicroUsd, output: res });
@@ -386,15 +405,38 @@ export function ProposalCard({
           ) : missing.length > 0 ? (
             <Text style={styles.payText}>Fill {missing.join(', ')}</Text>
           ) : (
-            <Text style={styles.payText}>Pay {usd(q.costMicroUsd)} & generate</Text>
+            <Text style={styles.payText}>
+              Pay {currency === 'SKR' ? (skrAmount ? `${skrAmount.toFixed(2)} SKR` : 'in SKR') : usd(q.costMicroUsd)} &
+              generate
+            </Text>
           )}
         </Pressable>
       )}
 
       {account && status !== 'done' && (
-        <Text style={styles.payHint}>
-          Paying from {account.address.slice(0, 4)}…{account.address.slice(-4)} · USDC on Solana
-        </Text>
+        <>
+          {/* One rail, two tokens. The gateway swaps the mint when asked, so
+              this is a header away — but the PRICE is always the dollar price;
+              SKR just settles it at the pool rate, minus the same 5% haircut
+              the challenge will quote. */}
+          <View style={styles.payWith}>
+            {(['USDC', 'SKR'] as const).map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => setCurrency(c)}
+                disabled={status === 'paying'}
+                style={[styles.payWithChip, currency === c && styles.payWithChipOn]}
+                hitSlop={6}
+              >
+                <Text style={[styles.payWithText, currency === c && styles.payWithTextOn]}>{c}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.payHint}>
+            Paying from {account.address.slice(0, 4)}…{account.address.slice(-4)} · {currency} on Solana
+            {currency === 'SKR' && skrRate ? ` · 1 SKR ≈ $${skrRate.toFixed(4)}` : ''}
+          </Text>
+        </>
       )}
 
       <ModelPicker
@@ -526,4 +568,15 @@ const styles = StyleSheet.create({
   payText: { color: '#0a0a0d', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
   payDoneText: { color: colors.green, fontSize: 15, fontWeight: '700' },
   payHint: { color: colors.textGhost, fontSize: 11, textAlign: 'center', marginTop: space(2) },
+  payWith: { flexDirection: 'row', justifyContent: 'center', gap: space(2), marginTop: space(3) },
+  payWithChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: space(4),
+    paddingVertical: space(1.5),
+  },
+  payWithChipOn: { borderColor: colors.flame, backgroundColor: 'rgba(245,158,11,0.12)' },
+  payWithText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
+  payWithTextOn: { color: colors.flameSoft },
 });
