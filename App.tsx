@@ -509,10 +509,10 @@ function Home({
         {
           id: 'arena',
           label: 'ARENA',
-          x: 0.52,
+          x: 0.5,
           y: 0.17,
-          w: 0.62,
-          h: 0.11,
+          w: 0.5,
+          h: 0.1,
           live: peek.open,
           status: peek.open ? `${left ?? 'closing'} · ${peek.entries} in` : 'no round yet',
           onPress: onArena,
@@ -520,10 +520,13 @@ function Home({
         {
           id: 'studio',
           label: 'STUDIO',
-          x: 0.55,
-          y: 0.44,
-          w: 0.6,
-          h: 0.11,
+          // 0.27 clipped the label's left edge by a few pixels: a 180dp label is
+          // centred on the node, so the usable band for a label is inset about
+          // 0.075 from the board's own visible band on each side.
+          x: 0.31,
+          y: 0.39,
+          w: 0.32,
+          h: 0.1,
           status: '100+ models',
           onPress: onNewChat,
         },
@@ -533,18 +536,18 @@ function Home({
           // somewhere you can go.
           id: 'snap',
           label: 'SNAP',
-          // The clearing between the arcade and the forge. Two earlier spots
-          // failed for opposite reasons: x=0.17 sat outside the visible band
-          // (the board overscans 1.35x, so only 0.13-0.87 is ever on screen),
-          // and y=0.655 sat UNDER the quest signpost, which owns the bottom
-          // fifth. A waypoint nobody can see is a feature nobody has.
-          // 0.74 put the node on screen but ran its 180dp label off the right
-          // edge: a label is centred on the node, so the usable band for one is
-          // narrower than the band for the node itself.
-          x: 0.66,
-          y: 0.33,
-          w: 0.26,
-          h: 0.08,
+          // The photo hut, beside the forge. The art has a building for it now,
+          // so the label sits on a place instead of floating over trees — which
+          // is what made it read as a sticker on the old three-building map.
+          // Three positions failed there and are worth not repeating: x=0.17 was
+          // outside the visible band (the board overscans 1.35x, so only
+          // 0.13-0.87 is ever on screen), y=0.655 was under the quest signpost,
+          // and x=0.74 fit the node but ran its centred 180dp label off the
+          // right edge.
+          x: 0.7,
+          y: 0.45,
+          w: 0.3,
+          h: 0.1,
           status: 'use your camera',
           onPress: onSnap,
         },
@@ -553,9 +556,9 @@ function Home({
           label: 'SHOWCASE',
           x: 0.5,
           // Lower than the roof line: the label hangs off the bottom of the hit
-          // box, and at 0.70 that landed in the middle of the gallery's facade.
-          y: 0.745,
-          w: 0.56,
+          // box, so level with the building it lands on the facade.
+          y: 0.72,
+          w: 0.44,
           h: 0.1,
           status: 'what others made',
           onPress: onShowcase,
