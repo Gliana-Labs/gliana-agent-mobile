@@ -509,10 +509,11 @@ function Home({
         {
           id: 'arena',
           label: 'ARENA',
-          x: 0.5,
-          y: 0.17,
-          w: 0.5,
-          h: 0.1,
+          // The arcade spans x 0.38-0.67, y 0.085-0.27 in the art.
+          x: 0.525,
+          y: 0.178,
+          w: 0.34,
+          h: 0.19,
           live: peek.open,
           status: peek.open ? `${left ?? 'closing'} · ${peek.entries} in` : 'no round yet',
           onPress: onArena,
@@ -523,10 +524,13 @@ function Home({
           // 0.27 clipped the label's left edge by a few pixels: a 180dp label is
           // centred on the node, so the usable band for a label is inset about
           // 0.075 from the board's own visible band on each side.
-          x: 0.31,
-          y: 0.39,
-          w: 0.32,
-          h: 0.1,
+          // The forge spans x 0.19-0.37, y 0.33-0.48. Same story as SNAP at the
+          // other edge: the box is on the forge, the label is nudged inward.
+          x: 0.28,
+          labelX: 0.32,
+          y: 0.405,
+          w: 0.24,
+          h: 0.16,
           status: '100+ models',
           onPress: onNewChat,
         },
@@ -544,22 +548,27 @@ function Home({
           // 0.13-0.87 is ever on screen), y=0.655 was under the quest signpost,
           // and x=0.74 fit the node but ran its centred 180dp label off the
           // right edge.
-          x: 0.7,
+          // The photo hut spans x 0.60-0.87, y 0.375-0.52. The hit box sits on
+          // the hut; the label is pulled left because past ~0.70 it runs off the
+          // screen's right edge (see labelX in MapBoard).
+          x: 0.735,
+          labelX: 0.69,
           y: 0.45,
           w: 0.3,
-          h: 0.1,
+          h: 0.16,
           status: 'use your camera',
           onPress: onSnap,
         },
         {
           id: 'showcase',
           label: 'SHOWCASE',
-          x: 0.5,
+          // The gallery spans x 0.36-0.71, y 0.63-0.82.
+          x: 0.535,
           // Lower than the roof line: the label hangs off the bottom of the hit
           // box, so level with the building it lands on the facade.
-          y: 0.72,
-          w: 0.44,
-          h: 0.1,
+          y: 0.725,
+          w: 0.38,
+          h: 0.19,
           status: 'what others made',
           onPress: onShowcase,
         },

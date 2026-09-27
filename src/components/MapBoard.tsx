@@ -54,6 +54,16 @@ export interface MapNode {
    */
   w?: number;
   h?: number;
+  /**
+   * Where the LABEL sits, when it cannot sit under the node's centre.
+   *
+   * The board is wider than the screen (see boardWidth: portrait art means the
+   * height branch wins, so it is ~754dp against a 450dp screen), and only the
+   * middle of it is ever visible. A hit box can live anywhere in that width —
+   * you pan to it — but a label has to be READABLE where it is drawn, and a
+   * label centred past roughly 0.70 runs off the right edge. Defaults to `x`.
+   */
+  labelX?: number;
   /** One live line under the label, when the node has something to say. */
   status?: string;
   live?: boolean;
@@ -72,6 +82,13 @@ const NODE_H = 0.12;
 const OVERSCAN = 1.35;
 /** Art aspect, so the board keeps its proportions at any size. */
 const ART_RATIO = 900 / 1613;
+/**
+ * Label width. A label is CENTRED on its node, so the band where a label fits
+ * is narrower than the band where a node fits — by half this, on each side.
+ * Every label clip so far (STUDIO left, SNAP right) was that arithmetic, so the
+ * box is only as wide as the longest status line needs.
+ */
+const LABEL_W = 150;
 
 export function MapBoard({
   nodes,
@@ -184,7 +201,7 @@ export function MapBoard({
             return (
               <View
                 key={`${n.id}-label`}
-                style={[styles.labelWrap, { left: n.x * boardWidth - 90, top: labelTop(n) }]}
+                style={[styles.labelWrap, { left: (n.labelX ?? n.x) * boardWidth - LABEL_W / 2, top: labelTop(n) }]}
                 pointerEvents="none"
               >
                 <Text style={styles.label}>{n.label}</Text>
@@ -230,7 +247,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pinText: { color: colors.ink, fontSize: 11, fontFamily: font.pixel },
-  labelWrap: { position: 'absolute', width: 180, alignItems: 'center' },
+  labelWrap: { position: 'absolute', width: LABEL_W, alignItems: 'center' },
   // Hard shadows, so a label stays readable wherever the art is bright.
   label: {
     color: colors.text,
