@@ -30,6 +30,8 @@ import { MenuIcon } from './src/components/icons';
 import { Backdrop } from './src/components/Backdrop';
 import type { Conversation, GenerationResult, Message, ProposalDraft } from './src/types';
 import { initSfx } from './src/lib/sfx';
+import { SnapSheet } from './src/components/SnapSheet';
+import { SnapError, snapProposal, takePhoto, uploadPhoto, type SnapStyle } from './src/lib/snap';
 
 const STUB_REPLY =
   'The agent is not live yet. Soon: I pick the right model for what you described, quote the exact price, and you approve it with one tap.';
@@ -84,6 +86,14 @@ function Main() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [typingId, setTypingId] = useState<string | null>(null);
+  /**
+   * SNAP: the photo waiting for a style, and whether we are uploading it. Kept
+   * here rather than in the sheet because the result of the flow is a new
+   * CONVERSATION, which only this component can create.
+   */
+  const [snapPhoto, setSnapPhoto] = useState<string | null>(null);
+  const [snapBusy, setSnapBusy] = useState(false);
+  const [snapError, setSnapError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showcaseOpen, setShowcaseOpen] = useState(false);
   const [arenaOpen, setArenaOpen] = useState(false);
@@ -193,6 +203,60 @@ function Main() {
     setTypingId(null);
   }
 
+  /** Shutter first, style second — see lib/snap.ts for why that order. */
+  async function startSnap() {
+    setSnapError(null);
+    try {
+      const uri = await takePhoto();
+      if (uri) setSnapPhoto(uri);
+    } catch (e) {
+      // A refused permission is the common case and is not a crash: say what to
+      // do about it, on the map, rather than opening an empty sheet.
+      setSnapError(e instanceof SnapError ? e.message : 'Could not open the camera.');
+      setSnapPhoto(null);
+    }
+  }
+
+  /**
+   * Turn the photo + style into the same proposal shape the agent emits, drop
+   * it into a fresh conversation, and go there. Everything after this point —
+   * the card, the price, the wallet, the result, entering the arena with it —
+   * is the existing path.
+   */
+  async function pickSnapStyle(style: SnapStyle) {
+    if (!snapPhoto) return;
+    setSnapBusy(true);
+    setSnapError(null);
+    try {
+      const url = await uploadPhoto(snapPhoto);
+      const proposal = await snapProposal(url, style);
+      const id = rid();
+      setConversations((all) => [
+        {
+          id,
+          title: `Snap · ${style.label.toLowerCase()}`,
+          messages: [
+            { id: rid(), role: 'user' as const, text: `Make this ${style.hint}.`, attachment: url },
+            {
+              id: rid(),
+              role: 'agent' as const,
+              text: `${style.label.toLowerCase()} it is — here's the price before anything runs.`,
+              proposal,
+            },
+          ],
+        },
+        ...all,
+      ]);
+      setActiveId(id);
+      setSnapPhoto(null);
+      setView('chat');
+    } catch (e) {
+      setSnapError(e instanceof SnapError ? e.message : 'Something went wrong preparing that photo.');
+    } finally {
+      setSnapBusy(false);
+    }
+  }
+
   function addResult(conversationId: string, result: GenerationResult) {
     const msg: Message = {
       id: rid(),
@@ -223,6 +287,21 @@ function Main() {
     <View style={styles.root}>
       <Backdrop />
 
+
+      <SnapSheet
+        photo={snapPhoto}
+        busy={snapBusy}
+        error={snapError}
+        onPick={(style) => void pickSnapStyle(style)}
+        onRetake={() => {
+          setSnapPhoto(null);
+          void startSnap();
+        }}
+        onClose={() => {
+          setSnapPhoto(null);
+          setSnapError(null);
+        }}
+      />
       <Sidebar
         visible={sidebarOpen}
         conversations={conversations}
@@ -312,6 +391,8 @@ function Main() {
               newChat();
               setView('chat');
             }}
+            onSnap={startSnap}
+            snapError={snapError}
           />
         ) : messages.length === 0 ? (
           <EmptyState onPick={send} peek={peek} onArena={() => setArenaOpen(true)} />
@@ -389,6 +470,8 @@ function Home({
   conversations,
   onOpenChat,
   onNewChat,
+  onSnap,
+  snapError,
 }: {
   peek: Peek;
   onArena: () => void;
@@ -397,6 +480,8 @@ function Home({
   conversations: Conversation[];
   onOpenChat: (id: string) => void;
   onNewChat: () => void;
+  onSnap: () => void;
+  snapError: string | null;
 }) {
   const left = timeLeft(peek.endsAt);
   // An empty "New chat" is not somewhere to pick up from.
@@ -439,6 +524,27 @@ function Home({
           onPress: onNewChat,
         },
         {
+          // The camera is a place on the map, not a button in a toolbar: the
+          // whole point of the overworld is that everything you can do is
+          // somewhere you can go.
+          id: 'snap',
+          label: 'SNAP',
+          // The clearing between the arcade and the forge. Two earlier spots
+          // failed for opposite reasons: x=0.17 sat outside the visible band
+          // (the board overscans 1.35x, so only 0.13-0.87 is ever on screen),
+          // and y=0.655 sat UNDER the quest signpost, which owns the bottom
+          // fifth. A waypoint nobody can see is a feature nobody has.
+          // 0.74 put the node on screen but ran its 180dp label off the right
+          // edge: a label is centred on the node, so the usable band for one is
+          // narrower than the band for the node itself.
+          x: 0.66,
+          y: 0.33,
+          w: 0.26,
+          h: 0.08,
+          status: 'use your camera',
+          onPress: onSnap,
+        },
+        {
           id: 'showcase',
           label: 'SHOWCASE',
           x: 0.5,
@@ -469,6 +575,7 @@ function Home({
             </View>
             <Text style={styles.questChevron}>›</Text>
           </Pressable>
+          {snapError ? <Text style={styles.snapError}>{snapError}</Text> : null}
           {last ? (
             <Pressable onPress={() => onOpenChat(last.id)} style={styles.resume} hitSlop={6}>
               <Text style={styles.resumeText} numberOfLines={1}>
@@ -657,6 +764,15 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.border,
     backgroundColor: 'rgba(11,11,14,0.95)',
+  },
+  // Camera trouble is reported on the map, where the tap happened — a sheet
+  // that opens empty because permission was refused explains nothing.
+  snapError: {
+    color: colors.red,
+    fontSize: 12,
+    textAlign: 'center',
+    textShadowColor: '#000',
+    textShadowRadius: 6,
   },
   resumeText: { color: colors.textDim, fontSize: 12 },
   sectionLabel: {

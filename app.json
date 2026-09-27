@@ -23,6 +23,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.FOREGROUND_SERVICE",
@@ -63,7 +64,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Gliana Agent to attach an image for image-to-video models."
+          "photosPermission": "Allow Gliana Agent to attach a photo to a generation.",
+          "cameraPermission": "Allow Gliana Agent to use the camera so you can snap a photo and restyle it."
         }
       ],
       "expo-font"
