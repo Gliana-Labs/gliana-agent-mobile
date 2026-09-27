@@ -13,7 +13,16 @@
  * (the wallet signs; the gateway broadcasts), then decodes the returned signed
  * wire transaction to extract our signature. No private key ever leaves the wallet.
  */
-import { createContext, createElement, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { transact, type AuthorizationResult } from '@solana-mobile/mobile-wallet-adapter-protocol';
 import {
   address,
@@ -26,6 +35,7 @@ import {
   type TransactionPartialSigner,
 } from '@solana/kit';
 import { Buffer } from 'buffer';
+import { loadWallet, saveWallet } from './storage';
 
 const APP_IDENTITY = {
   name: 'Gliana Agent',
@@ -89,6 +99,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
+  /**
+   * Restore the session on launch.
+   *
+   * The token is only a handle: every signing session still calls `reauthorize`
+   * against the wallet, so a revoked or expired token fails there and the user
+   * reconnects. Restoring it just means they do not have to do that to READ
+   * their own balance and history.
+   */
+  useEffect(() => {
+    let alive = true;
+    void loadWallet().then((w) => {
+      if (!alive || !w) return;
+      setAccount({ address: w.address, label: w.label });
+      setAuthToken(w.authToken);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const connect = useCallback(async () => {
     setConnecting(true);
     try {
@@ -98,6 +128,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       });
       setAccount(acct);
       setAuthToken(token);
+      void saveWallet({ address: acct.address, label: acct.label, authToken: token });
     } finally {
       setConnecting(false);
     }
@@ -107,6 +138,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const token = authToken;
     setAccount(null);
     setAuthToken(null);
+    void saveWallet(null);
     if (token) {
       // Best-effort revoke; ignore failures (e.g. wallet not reachable).
       transact(async (wallet) => wallet.deauthorize({ auth_token: token })).catch(() => {});
