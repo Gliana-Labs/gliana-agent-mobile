@@ -108,7 +108,12 @@ async function main() {
     const { value: lamports } = await rpc.getBalance(address(w.address)).send();
     const held = await skrBalance(address(w.address));
     fundWallet(w.address, BigInt(lamports) < SOL_PER_WALLET, held < ENTRY_FEE);
-    const sig = await enterRound(w, roundId, entry.uri);
+    // Public mainnet RPC hands out a blockhash from one node and simulates on
+    // another that has not seen it yet — "Blockhash not found", on a
+    // transaction that is perfectly valid. Retry with a fresh one. The APP does
+    // not do this: there a human tapped a button, so it says the network was
+    // busy and lets them decide. A seeder has nobody to ask.
+    const sig = await withRetry(() => enterRound(w, roundId, entry.uri));
     console.log(`${entry.name}: entered — ${sig}`);
   }
 }
@@ -131,6 +136,19 @@ function fundWallet(to: string, needSol: boolean, needSkr: boolean) {
   if (needSkr) {
     run('spl-token', ['transfer', SKR_MINT, String(fee), to, '--fund-recipient', '--allow-unfunded-recipient',
       '-u', RPC_URL, '--fee-payer', FUNDER, '--owner', FUNDER]);
+  }
+}
+
+async function withRetry<T>(fn: () => Promise<T>, tries = 4): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (i >= tries || !/blockhash|simulation failed|-32002/i.test(msg)) throw err;
+      console.log(`  retry ${i}/${tries - 1} after: ${msg.split('\n')[0]}`);
+      await new Promise((r) => setTimeout(r, 1500 * i));
+    }
   }
 }
 
