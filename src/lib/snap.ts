@@ -11,7 +11,6 @@
  * code. Nothing about payment is special here — which is the point: a second
  * way to pay would be a second thing to get wrong.
  */
-import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { API, quote, type Proposal } from './api';
 
@@ -84,24 +83,8 @@ export const SNAP_STYLES: SnapStyle[] = [
   },
 ];
 
-/** Camera roll limit on the gateway's /v1/media (40 MB, no base64). */
-const MAX_BYTES = 40 * 1024 * 1024;
-
 export class SnapError extends Error {}
 
-/**
- * Open the camera and return the photo's local uri, or null when the user
- * backs out — which is not an error and must not be shown as one.
- */
-export async function takePhoto(): Promise<string | null> {
-  const perm = await ImagePicker.requestCameraPermissionsAsync();
-  if (!perm.granted) throw new SnapError('Allow camera access to snap a photo.');
-  const res = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 });
-  if (res.canceled || !res.assets?.length) return null;
-  const shot = res.assets[0];
-  if ((shot.fileSize ?? 0) > MAX_BYTES) throw new SnapError('That photo is over 40 MB — try a lower camera resolution.');
-  return shot.uri;
-}
 
 /** Upload to R2 through the gateway and get back the hosted URL the model reads. */
 export async function uploadPhoto(uri: string): Promise<string> {

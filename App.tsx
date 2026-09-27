@@ -31,7 +31,8 @@ import { Backdrop } from './src/components/Backdrop';
 import type { Conversation, GenerationResult, Message, ProposalDraft } from './src/types';
 import { initSfx } from './src/lib/sfx';
 import { SnapSheet } from './src/components/SnapSheet';
-import { SnapError, snapProposal, takePhoto, uploadPhoto, type SnapStyle } from './src/lib/snap';
+import { Viewfinder } from './src/components/Viewfinder';
+import { SnapError, snapProposal, uploadPhoto, type SnapStyle } from './src/lib/snap';
 
 const STUB_REPLY =
   'The agent is not live yet. Soon: I pick the right model for what you described, quote the exact price, and you approve it with one tap.';
@@ -92,6 +93,8 @@ function Main() {
    * CONVERSATION, which only this component can create.
    */
   const [snapPhoto, setSnapPhoto] = useState<string | null>(null);
+  /** The viewfinder is a screen of ours, not a trip to the system camera app. */
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [snapBusy, setSnapBusy] = useState(false);
   const [snapError, setSnapError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -204,17 +207,9 @@ function Main() {
   }
 
   /** Shutter first, style second — see lib/snap.ts for why that order. */
-  async function startSnap() {
+  function startSnap() {
     setSnapError(null);
-    try {
-      const uri = await takePhoto();
-      if (uri) setSnapPhoto(uri);
-    } catch (e) {
-      // A refused permission is the common case and is not a crash: say what to
-      // do about it, on the map, rather than opening an empty sheet.
-      setSnapError(e instanceof SnapError ? e.message : 'Could not open the camera.');
-      setSnapPhoto(null);
-    }
+    setCameraOpen(true);
   }
 
   /**
@@ -288,6 +283,15 @@ function Main() {
       <Backdrop />
 
 
+      <Viewfinder
+        visible={cameraOpen}
+        onShot={(uri) => {
+          setCameraOpen(false);
+          setSnapPhoto(uri);
+        }}
+        onClose={() => setCameraOpen(false)}
+      />
+
       <SnapSheet
         photo={snapPhoto}
         busy={snapBusy}
@@ -295,7 +299,7 @@ function Main() {
         onPick={(style) => void pickSnapStyle(style)}
         onRetake={() => {
           setSnapPhoto(null);
-          void startSnap();
+          setCameraOpen(true);
         }}
         onClose={() => {
           setSnapPhoto(null);
