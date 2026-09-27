@@ -22,6 +22,21 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 declare_id!("2CdzdzR1hj6w1ZjXLgvk3o2Saq5sXd1ufQ3Toww4PPHQ");
 
+/// Baked into the binary so an explorer can find it without an index.
+/// Mirrors program/arena/security.json, which is also written to the
+/// program-metadata PDA — two standards, one set of facts.
+#[cfg(not(feature = "no-entrypoint"))]
+solana_security_txt::security_txt! {
+    name: "Gliana Arena",
+    project_url: "https://agent.glianalabs.com",
+    contacts: "email:contact@glianalabs.com,link:https://github.com/Gliana-Labs/gliana-agent-mobile/issues",
+    policy: "https://github.com/Gliana-Labs/gliana-agent-mobile/blob/master/program/arena/SECURITY.md",
+    preferred_languages: "en,id",
+    source_code: "https://github.com/Gliana-Labs/gliana-agent-mobile/tree/master/program/arena",
+    source_release: "v1.1.0",
+    auditors: "None. This program has not been audited."
+}
+
 /// Winner's share, in basis points. The rest: 2500 split across places 2-5,
 /// 1500 split across the wallets that voted for the winner. Fixed in the
 /// program rather than passed in, so a round cannot be created with a payout

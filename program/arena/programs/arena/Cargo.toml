@@ -26,6 +26,11 @@ anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
 # touch, and all of it lands in the binary — which is what program rent is
 # charged on. We use SPL Token and ATAs, nothing else.
 anchor-spl = { version = "0.32.1", default-features = false, features = ["token", "associated_token", "token_2022"] }
+# The CLASSIC security.txt: a string baked into the binary between marker
+# lines. The newer program-metadata PDA is written too, but most explorers
+# still read this one, and an explorer saying "no security.txt" on a program
+# that holds other people's SKR is the wrong first impression.
+solana-security-txt = "1.1.1"
 
 
 [lints.rust]
