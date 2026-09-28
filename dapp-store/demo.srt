@@ -1,75 +1,75 @@
 1
-00:00:00,400 --> 00:00:03,840
+00:00:00,400 --> 00:00:05,040
 Buying one AI image means a signup and a card on file.
 
 2
-00:00:03,900 --> 00:00:07,580
+00:00:05,930 --> 00:00:09,690
 Gliana Agent. Pay per result, from your own wallet.
 
 3
-00:00:07,700 --> 00:00:11,140
+00:00:10,470 --> 00:00:14,070
 The home screen is a map, drawn by the product itself.
 
 4
-00:00:12,000 --> 00:00:16,720
-Most of it is a conversation. One box reaches every model we sell.
+00:00:15,430 --> 00:00:17,830
+One box reaches every model we sell.
 
 5
-00:00:17,000 --> 00:00:22,440
-The agent picks one and quotes the price. Sixty seconds of music, eighteen cents.
+00:00:20,430 --> 00:00:24,910
+The agent picks one and quotes the price. Eighteen cents.
 
 6
-00:00:22,600 --> 00:00:29,080
-Not only generation. Fifty tools are priced the same way. SEC filings, half a cent.
+00:00:25,930 --> 00:00:31,370
+Not only generation. Fifty tools, priced the same way.
 
 7
-00:00:29,200 --> 00:00:33,120
-On a phone there is a second way in. The camera is the prompt.
+00:00:31,590 --> 00:00:34,230
+On a phone, the camera is the prompt.
 
 8
-00:00:33,500 --> 00:00:37,980
+00:00:36,930 --> 00:00:42,370
 Today's quest leads: your machine, transformed into a robot.
 
 9
-00:00:39,500 --> 00:00:44,700
-The exact price comes first. Four point eight cents, before anything runs.
+00:00:42,930 --> 00:00:46,370
+The price comes first. Four point eight cents.
 
 10
-00:00:45,400 --> 00:00:47,400
+00:00:48,930 --> 00:00:51,490
 One approval, signed in Seed Vault.
 
 11
-00:00:48,700 --> 00:00:56,380
-And the photograph comes back transformed. Same table, same curtain, same cable. You paid for it, you own it.
+00:00:52,130 --> 00:00:58,530
+The photograph comes back transformed. Same table, same curtain, same cable.
 
 12
-00:00:58,700 --> 00:01:02,780
+00:01:02,130 --> 00:01:06,290
 Now stake it. One global round a day, on Solana mainnet.
 
 13
-00:01:06,700 --> 00:01:13,580
-Entry is five SKR, or four if you hold a hundred, and that discount is read from your token account on chain.
+00:01:10,130 --> 00:01:15,570
+Entry is five SKR, or four if you hold a hundred. The chain checks.
 
 14
-00:01:15,500 --> 00:01:17,260
+00:01:19,130 --> 00:01:21,210
 The wallet shows the same numbers.
 
 15
-00:01:18,300 --> 00:01:23,740
+00:01:21,730 --> 00:01:27,810
 You are in. The pot is nineteen SKR, held by the round's own vault.
 
 16
-00:01:27,300 --> 00:01:33,140
+00:01:30,730 --> 00:01:38,410
 Four machines transformed. A fan, a rice cooker, a motorbike, and yours.
 
 17
-00:01:36,300 --> 00:01:41,900
-Voting is free. One per wallet, enforced by whether a program account exists.
+00:01:39,730 --> 00:01:43,490
+Voting is free. One per wallet, enforced on chain.
 
 18
-00:01:45,300 --> 00:01:49,300
+00:01:48,730 --> 00:01:52,970
 Payouts are permissionless. The pot pays out even if we disappear.
 
 19
-00:01:50,300 --> 00:01:52,940
+00:01:53,730 --> 00:01:56,370
 It is live on the Solana dApp Store today.
