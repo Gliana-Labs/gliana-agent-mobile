@@ -150,6 +150,12 @@ under a deadline.
 ```
 https://ai.glianalabs.com/clockin
 ```
+PDF, for reviewers whose tools cannot render an HTML deck:
+`https://ai.glianalabs.com/clockin/gliana-agent-clockin.pdf`
+
+Technical evidence (boundaries, build steps, on-chain transaction for every
+claim, measured latencies):
+`https://github.com/Gliana-Labs/gliana-agent-mobile/blob/master/TECHNICAL.md`
 
 ## DEMO VIDEO URL
 ```
@@ -163,5 +169,5 @@ https://github.com/Gliana-Labs/gliana-agent-mobile
 
 ## ANDROID APK URL
 ```
-https://github.com/Gliana-Labs/gliana-agent-mobile/releases/download/v1.1.0/app-release.apk
+https://github.com/Gliana-Labs/gliana-agent-mobile/releases/download/v1.1.1/app-release.apk
 ```
