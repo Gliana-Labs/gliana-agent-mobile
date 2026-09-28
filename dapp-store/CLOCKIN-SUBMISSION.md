@@ -23,39 +23,58 @@ N/A
 ## IF PORTING AN EXISTING APPLICATION OVER TO MOBILE, WHAT MAJOR FEATURES OR NEW SIGNIFICANT MOBILE DEVELOPMENT HAVE YOU DONE?
 
 ```
-Gliana Agent began as a web app (agent.glianalabs.com). The Android app is a
-native rebuild in Expo/React Native — not a webview — and the parts that matter
-only exist on mobile.
+Not a port — see the next answer.
 
-SNAP: the camera is the prompt. Point the phone at something, pick a look, and
-the photo comes back transformed — for 4.8 cents, paid per result. A blank chat
+GlianaAI started as a pay-per-call AI inference API settled over HTTP 402
+(x402 / MPP rails): one endpoint, 116 models, no accounts and no API keys,
+built so that a human OR an autonomous agent could buy a single inference.
+Web and mobile were always planned as clients of that API, and the Android app
+is a client in its own right rather than a web app moved across.
+```
+
+## IF NO, WHAT MAJOR FEATURES OR NEW SIGNIFICANT MOBILE DEVELOPMENT HAVE YOU DONE?
+
+```
+The product is a pay-per-call inference API settled over HTTP 402 — 116 models,
+no account, no API key, each call paid from the caller's own wallet. The Android
+app is the client that uses the half of that API a laptop cannot reach, and
+everything below was built for the phone.
+
+SNAP: THE CAMERA IS THE PROMPT. Point the phone at something, pick a look, and
+the photo comes back transformed for 4.8 cents, paid per result. A blank chat
 box asks a hard question; a photograph of your desk does not. The viewfinder is
-in-app (handing off to the system camera cost a cold start, someone else's UI
-and a return trip), and the shot is resized to 1280px before it leaves the
+in-app — handing off to the system camera cost a cold start, someone else's UI
+and a return trip — and the shot is resized to 1280px before it leaves the
 phone, because that upload was most of the wait between the shutter and the
 price.
 
-THE PHOTO QUEST: every day has a theme, and the quest leads the style sheet, so
+THE ARENA: A DAILY CONTEST ON ITS OWN ANCHOR PROGRAM, LIVE ON MAINNET. Entry
+fees, the pot and payouts are in SKR, the vault is owned by the round's PDA,
+payouts are permissionless, and the holder discount is read from the entrant's
+own token account on-chain. It exists only in the app and is described in full
+in the SKR answer below.
+
+THE PHOTO QUEST. Every day has a theme and the quest leads the style sheet, so
 an entry is your own photograph bent toward the theme rather than a prompt
 anyone could have typed. Today's is "your machine, transformed into a robot" —
 the demo video is a real photo of the author's PC standing up as a mecha on the
-same table it was shot on.
+table it was shot on.
 
-MOBILE WALLET ADAPTER: payments are signed in Seed Vault and settle from the
-user's own wallet — no account, no API key, no balance held by us. One
-non-obvious fix made it work: wallets re-serialise a transaction before signing,
-so the signed wire bytes must be submitted verbatim rather than re-encoded from
-our own object, or the signature verifies against the wrong message.
+MOBILE WALLET ADAPTER. Payments are signed in Seed Vault and settle from the
+user's own wallet. One non-obvious fix made it work on device: wallets
+re-serialise a transaction before signing, so the signed wire bytes must be
+submitted verbatim rather than re-encoded from our own object, or the signature
+verifies against the wrong message.
 
-A GAME MAP AS THE HOME SCREEN: four buildings — arcade, forge, photo hut,
+A GAME MAP AS THE HOME SCREEN. Four buildings — arcade, forge, photo hut,
 gallery — drawn by GlianaAI itself through the same paid API the app sells.
 Panning runs on the UI thread through Reanimated shared values, and travel is a
 tap gesture racing the pan, because a Pressable inside a panning transform
 loses every touch that drifts.
 
-AN OFFLINE DAILY LOOP: a round is a UTC-based day, its id IS the day number, and
-the theme comes from a fixed list indexed by it — so the phone schedules a week
-of local quest reminders with no push server, no token, and nothing for us to
+AN OFFLINE DAILY LOOP. A round is a day, its id IS the day number, and the
+theme comes from a fixed list indexed by it — so the phone schedules a week of
+local quest reminders with no push server, no token, and nothing for us to
 hold. Rounds roll at 19:00 WIB rather than midnight UTC, because a contest that
 closes at 07:00 pays out while its players are asleep.
 
@@ -65,11 +84,6 @@ session and conversations persisted so a cold start does not re-open the wallet
 sheet, five synthesised arcade sounds that never interrupt the user's music, and
 an adaptive launcher icon. Published on the Solana dApp Store as
 com.glianalabs.agent.
-```
-
-## IF NO, WHAT MAJOR FEATURES OR NEW SIGNIFICANT MOBILE DEVELOPMENT HAVE YOU DONE?
-```
-N/A — see the porting answer above.
 ```
 
 ## DOES YOUR APPLICATION HAVE AN SKR INTEGRATION? IF SO, HOW?
