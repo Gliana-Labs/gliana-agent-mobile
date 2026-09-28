@@ -45,20 +45,21 @@ release:
   catalog:
     en-US:
       name: Gliana Agent
-      short_description: 110+ AI models and utility tools — pay per result from your wallet.
+      # The portal's Subtitle field caps at 50 characters.
+      short_description: 110+ AI models, paid per result from your wallet
       long_description: >
-        Describe what you want. Gliana Agent picks the right model, quotes the exact
-        price before anything runs, and you approve it with one tap — paid in USDC
-        from your Solana wallet via Mobile Wallet Adapter.
+        Describe what you want. Gliana Agent picks the model, shows you the exact
+        price before anything runs, and takes one approval from your Solana wallet
+        — 110+ models across image, video, voice, music and chat, plus 50 utility
+        tools like SEC filing search, document reading and web extraction.
 
 
-        110+ AI models across image, video, voice, music, animate and transcribe, plus
-        utility tools: turn a web page into structured data, summarise a YouTube
-        video, read a document, build social cards, check token and currency prices.
+        No signup, no API key, no subscription, and no balance to top up. You pay
+        per result, and a request that fails costs you nothing.
 
 
-        No signup, no API key, no subscription, and no balance to top up — you pay
-        per result, and nothing is charged if a request is rejected.
+        Point the camera at something to restyle it, or stake what you made in the
+        daily Arena and vote on everyone else's.
       new_in_version: >
         The app now opens on a pixel overworld you walk around, not a text box.
         Four places: the Studio for any model, SNAP for your camera, the Arena
