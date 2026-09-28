@@ -2,7 +2,7 @@
   "expo": {
     "name": "Gliana Agent",
     "slug": "gliana-agent-mobile",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "glianaagent",
@@ -15,7 +15,7 @@
     },
     "android": {
       "package": "com.glianalabs.agent",
-      "versionCode": 5,
+      "versionCode": 6,
       "userInterfaceStyle": "dark",
       "adaptiveIcon": {
         "backgroundColor": "#0b0b0e",
