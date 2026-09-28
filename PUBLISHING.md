@@ -42,18 +42,44 @@ cd android && ./gradlew assembleRelease
 > `npx expo prebuild --clean`, re-apply that block (plain prebuild keeps it).
 
 ## 3. Publish with the dApp Store CLI
+
+> The CLI changed. The old `create publisher` / `create app` / `create release`
+> / `publish submit` sequence (and the `config.yaml` it read) is gone — that
+> flow minted the NFTs itself. The current CLI is portal-backed: the app must
+> already exist in the publishing portal with its App NFT, and listing metadata
+> (icon, screenshots, descriptions) is edited in the portal, not in this repo.
+> `dapp-store/config.yaml` is kept as our record of that copy, not as input.
+
 ```bash
-# Scaffold (already done: dapp-store/config.yaml). Fill in screenshots + copy.
-npx dapp-store init                      # if starting fresh
-npx dapp-store create publisher -k <publisher-keypair.json> -u <rpc>
-npx dapp-store create app       -k <publisher-keypair.json> -u <rpc>
-npx dapp-store create release   -k <publisher-keypair.json> -u <rpc> \
-  --build-tools-path $ANDROID_HOME/build-tools/35.0.0
-npx dapp-store publish submit   -k <publisher-keypair.json> -u <rpc> \
-  --requestor-is-authorized --complies-with-solana-dapp-store-policies
+export DAPP_STORE_API_KEY=...            # portal API key
+npx @solana-mobile/dapp-store-cli@latest \
+  --apk-file ./app-release.apk \
+  --whats-new "$(cat dapp-store/whats-new.txt)" \
+  --keypair <publisher-keypair.json>
 ```
-Each `create` mints an on-chain NFT (publisher → app → release). `submit` sends it
-for Solana's review.
+The portal decides whether this is a first release or an update. If it dies
+part-way through, resume rather than re-running:
+```bash
+npx @solana-mobile/dapp-store-cli@latest resume --release-id <release-id>
+```
+
+## 2b. Where the APK comes from (read this before building locally)
+
+Use **EAS cloud builds**. Expo holds the release keystore for this project
+(`Build Credentials kSvbYdoSqO`), so no password is needed locally and the key
+never lands on a dev machine:
+```bash
+npx eas-cli build --platform android --profile dapp-store
+```
+A local `./gradlew assembleRelease` **silently falls back to the public debug
+keystore** when the `GLIANA_UPLOAD_*` vars are unset — that is how a 120 MB
+`app-release.apk` signed `CN=Android Debug` ended up in this tree. Always check
+before uploading anything:
+```bash
+$ANDROID_HOME/build-tools/36.1.0/apksigner verify --print-certs <apk>
+```
+The DN must not say `CN=Android Debug`. A debug-signed APK cannot update the
+store listing, and the debug key's password is public.
 
 ## Assets needed for the listing
 - App icon (have it: `assets/icon.png`, 512px).

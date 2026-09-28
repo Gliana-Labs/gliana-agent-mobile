@@ -1,0 +1,12 @@
+The app now opens on a pixel overworld you walk around, not a text box: the
+Studio for any model, SNAP for your camera, the Arena, and your profile.
+
+SNAP is new — point the camera at something real and restyle it without
+leaving the app. Each day carries a photo quest with its own theme.
+
+The Arena is live on Solana mainnet with real SKR. Stake to enter the day's
+theme, vote for free, and the pot pays out from an on-chain vault only the
+program can move.
+
+Also: the proposal card reads as a receipt, not a parameter dump, and a dead
+wallet authorization repairs itself instead of failing your payment.

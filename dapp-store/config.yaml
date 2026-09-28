@@ -6,7 +6,7 @@ publisher:
   email: contact@glianalabs.com
   media:
     - purpose: icon
-      uri: ../assets/icon.png
+      uri: ./media/icon-512.png
 
 app:
   name: Gliana Agent
@@ -18,7 +18,7 @@ app:
     website: https://agent.glianalabs.com
   media:
     - purpose: icon
-      uri: ../assets/icon.png
+      uri: ./media/icon-512.png
 
 release:
   address: # filled by the CLI on `create release`
@@ -39,14 +39,14 @@ release:
   catalog:
     en-US:
       name: Gliana Agent
-      short_description: 90+ AI models and utility tools — pay per result from your wallet.
+      short_description: 110+ AI models and utility tools — pay per result from your wallet.
       long_description: >
         Describe what you want. Gliana Agent picks the right model, quotes the exact
         price before anything runs, and you approve it with one tap — paid in USDC
         from your Solana wallet via Mobile Wallet Adapter.
 
 
-        90+ AI models across image, video, voice, music, animate and transcribe, plus
+        110+ AI models across image, video, voice, music, animate and transcribe, plus
         utility tools: turn a web page into structured data, summarise a YouTube
         video, read a document, build social cards, check token and currency prices.
 
@@ -54,19 +54,25 @@ release:
         No signup, no API key, no subscription, and no balance to top up — you pay
         per result, and nothing is charged if a request is rejected.
       new_in_version: >
-        Wallet payments are fixed — transactions signed with Phantom, Solflare or
-        Seed Vault now settle reliably. If payments failed for you before, this is
-        the update.
+        The app now opens on a pixel overworld you walk around, not a text box.
+        Four places: the Studio for any model, SNAP for your camera, the Arena
+        for the daily contest, and your profile.
 
 
-        The agent also does more than generate now: alongside 90+ models it can run
-        utility tools — pull structured data out of a web page, summarise a YouTube
-        video, read a document, build a social card.
+        SNAP is new — point the camera at something real and restyle it without
+        leaving the app, using an in-app viewfinder rather than a trip to the
+        system camera. Each day carries a photo quest with its own theme.
 
 
-        Smaller things: every model setting shows what it does and whether it is
-        required, and connection blips while switching to your wallet now explain
-        themselves.
+        The Arena is live on Solana mainnet with real SKR. Stake to enter the
+        day's theme, vote for free, and the pot pays out from an on-chain vault
+        that only the program can move. Holding SKR earns a discount the chain
+        verifies, and payouts can be claimed by anyone once a round closes.
+
+
+        Smaller things: the proposal card reads as a receipt instead of a
+        parameter dump, a dead wallet authorization repairs itself instead of
+        failing your payment, and arcade sound can be muted from the profile.
       saga_features: Pay-per-result with Mobile Wallet Adapter (Seed Vault).
       android_details:
         - Native Android app built for Seeker — payments via Mobile Wallet
