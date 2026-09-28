@@ -41,10 +41,9 @@ const FUNDER = process.env.KEYPAIR ?? `${process.env.HOME}/.config/solana/id.jso
 const SOL_PER_WALLET = 3_000_000n;
 
 const ENTRIES = [
-  { name: 'dusk', uri: 'https://api.glianalabs.com/v1/media/37e2c22bca7a28d4d2cc1fd17cec62ba.jpg' },
-  { name: 'pixel', uri: 'https://api.glianalabs.com/v1/media/09ef6997bfc9d9662d445286701f2b86.jpg' },
-  { name: 'clay', uri: 'https://api.glianalabs.com/v1/media/60b4eaa0e0b38e7d9856a0fa960ad321.jpg' },
-  { name: 'poster', uri: 'https://api.glianalabs.com/v1/media/37ec8d80079b92065df80bab8426248e.jpg' },
+  { name: 'fan', uri: 'https://api.glianalabs.com/v1/media/6947cabff9e0e9b024e45ab18c088c41.jpg' },
+  { name: 'cooker', uri: 'https://api.glianalabs.com/v1/media/a0423db78d26b438a5078c2fca15b7e6.jpg' },
+  { name: 'bike', uri: 'https://api.glianalabs.com/v1/media/bcd7093ef07076a99b764bf21bab807e.jpg' },
 ];
 
 async function signerFromFile(path: string): Promise<WireSigner & { keyPair: CryptoKeyPair }> {
@@ -152,10 +151,23 @@ async function withRetry<T>(fn: () => Promise<T>, tries = 4): Promise<T> {
   }
 }
 
-function run(cmd: string, args: string[]) {
-  const res = spawnSync(cmd, args, { encoding: 'utf8' });
-  if (res.status !== 0) throw new Error(`${cmd} failed: ${res.stderr || res.stdout}`);
-  return res.stdout.trim();
+/**
+ * Public RPC fails a few percent of the time in ways that are not about us:
+ * blockhashes one node has not seen, and simulations that report
+ * "exceeded CUs meter ... consumed 0 of 0" for a plain ATA creation. Both are
+ * transient, so the CLI calls retry too — not just the program calls.
+ */
+function run(cmd: string, args: string[], tries = 4) {
+  for (let i = 1; ; i++) {
+    const res = spawnSync(cmd, args, { encoding: 'utf8' });
+    if (res.status === 0) return res.stdout.trim();
+    const err = res.stderr || res.stdout;
+    if (i >= tries || !/blockhash|simulation failed|-32002|CUs meter|Unable to confirm/i.test(err)) {
+      throw new Error(`${cmd} failed: ${err}`);
+    }
+    console.log(`  retry ${i}/${tries - 1}: ${err.split('\n')[0].slice(0, 90)}`);
+    spawnSync('sleep', [String(2 * i)]);
+  }
 }
 
 void main();

@@ -55,8 +55,30 @@ export const fromSkrBase = (base: bigint | number): number => Number(base) / 10 
  * stored so every client agrees on today's round without asking a server —
  * there is no server.
  */
+/**
+ * When a round rolls over, in hours past UTC midnight.
+ *
+ * 12:00 UTC is 19:00 in Jakarta — the evening, when people are on their phones.
+ * A plain UTC day ends at 07:00 WIB, so the previous design flipped the theme,
+ * closed the voting and paid the pot while the players were asleep, and the
+ * "ends in" countdown spent all evening reading eleven hours. A daily contest
+ * should turn over when its audience is awake.
+ *
+ * The chain does not care: `round_id` is just a number the program stores, and
+ * `ends_at` is a timestamp it checks against the clock. Both sides of the app
+ * and the opener script derive from THIS constant, so they cannot disagree.
+ */
+export const ROLL_HOUR_UTC = 12;
+const ROLL_MS = ROLL_HOUR_UTC * 3_600_000;
+
+/**
+ * A round is identified by the UTC day it ENDS on, not the one it starts on —
+ * which is what makes the shift work without colliding with rounds already on
+ * chain: a round opened under the old midnight-UTC scheme keeps its number, and
+ * the first round under the new schedule simply takes the next one.
+ */
 export const roundIdFor = (when: Date = new Date()): bigint =>
-  BigInt(Math.floor(when.getTime() / 86_400_000));
+  BigInt(Math.floor((when.getTime() + ROLL_MS) / 86_400_000));
 
 /**
  * The daily themes, in a fixed list indexed by round id.
@@ -81,7 +103,8 @@ export const themeFor = (roundId: bigint): string => THEMES[Number(roundId % Big
 export const ENTRY_FEE = toSkrBase(5);
 
 /** A round ends at the next UTC midnight. */
-export const roundEndsAt = (roundId: bigint): number => Number(roundId + 1n) * 86_400;
+export const roundEndsAt = (roundId: bigint): number =>
+  Number(roundId) * 86_400 + ROLL_HOUR_UTC * 3_600;
 
 /** SKR, formatted the way the UI shows it: no trailing zeros, no currency symbol. */
 export const skr = (base: bigint | number): string => {

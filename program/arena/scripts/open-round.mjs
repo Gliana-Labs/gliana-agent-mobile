@@ -24,7 +24,7 @@ const FEE = BigInt(process.env.ENTRY_FEE ?? 5_000_000); // 5 SKR
  * generating for, and the theme is written into the account once, at creation.
  */
 const THEMES = JSON.parse(readFileSync(new URL('../../../src/arena/themes.json', import.meta.url), 'utf8'));
-const todayId = Math.floor(Date.now() / 86_400_000);
+const todayId = Math.floor((Date.now() + 12 * 3_600_000) / 86_400_000);
 const THEME = process.env.THEME ?? THEMES[todayId % THEMES.length];
 
 const idl = JSON.parse(readFileSync(new URL('../target/idl/arena.json', import.meta.url), 'utf8'));
@@ -36,8 +36,14 @@ const provider = new AnchorProvider(new Connection(RPC, 'confirmed'), new Wallet
 });
 const program = new Program(idl, provider);
 
-const roundId = BigInt(Math.floor(Date.now() / 86_400_000));
-const endsAt = Number(roundId + 1n) * 86_400;
+/**
+ * Must match src/arena/config.ts exactly. A round rolls at 12:00 UTC (19:00 in
+ * Jakarta) and is numbered by the UTC day it ENDS on — an opener that disagreed
+ * with the app would create an account the app never looks at.
+ */
+const ROLL_HOUR_UTC = 12;
+const roundId = BigInt(Math.floor((Date.now() + ROLL_HOUR_UTC * 3_600_000) / 86_400_000));
+const endsAt = Number(roundId) * 86_400 + ROLL_HOUR_UTC * 3_600;
 const idLe = Buffer.alloc(8);
 idLe.writeBigUInt64LE(roundId);
 

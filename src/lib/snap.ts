@@ -169,6 +169,29 @@ export async function snapProposal(photoUrl: string, style: SnapStyle): Promise<
 /**
  * Today's theme as a look of its own.
  *
+ * FIVE PARTS, IN THIS ORDER, and every one of them earned its place against a
+ * photo of a PC and the theme "your machine, transformed into a robot":
+ *
+ *   1. the theme FIRST, because whatever leads is what the model obeys;
+ *   2. "apply this to the object in the photo", binding it to the subject;
+ *   3. "rebuilt from its own panels, lights, cables", which is what keeps the
+ *      thing recognisable — the PC's RGB strips came back as the robot's chest
+ *      light bars;
+ *   4. the room, surface and camera angle pinned, so it stays the same picture;
+ *   5. "strong visible change", because without it the model does the minimum.
+ *
+ * The VERB carries more weight than any of the qualifiers. "It transforms and
+ * reassembles into that" works; "it becomes that" does not, and the difference
+ * is reproducible on the same photograph. Softening the verb while adding one
+ * more reassurance ("so it stays recognisably the same thing", "same surface")
+ * was enough to turn a robot back into a PC with its lights switched off.
+ *
+ * Two earlier versions failed in opposite directions. "The setting around it
+ * changes to suit the theme" told it to change the ROOM, so a PC stayed a PC in
+ * a slightly different room. "You may reshape the object, the surroundings, or
+ * both — whatever the theme requires" was permissive enough that it simply
+ * turned the RGB lighting off and called it done.
+ *
  * Built rather than listed, because the theme changes daily and it is the whole
  * point of the arena: the entry should be YOUR photo bent toward the quest, not
  * a generic render of the words. So the instruction keeps the subject and the
@@ -180,10 +203,9 @@ export function questStyle(theme: string): SnapStyle {
     label: "TODAY'S QUEST",
     hint: theme,
     prompt:
-      `Transform this photo so it reads as "${theme}" at a glance, building that ` +
-      `scene OUT OF what was photographed: the same object stays the subject and ` +
-      `keeps its colours and materials, and the setting around it changes to suit ` +
-      `the theme. Keep the same camera angle. One coherent image, not a collage.`,
+      `${theme}. Apply this to the object in the photo: it transforms and ` +
+      `reassembles into that, built from its own panels, lights and cables. ` +
+      `Same room, same camera angle, same colours. Strong visible change.`,
   };
 }
 

@@ -271,6 +271,18 @@ function summarise(
  */
 function readableError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
+  /**
+   * Rent, not the fee, and not SKR. Voting creates a Vote PDA and the voter
+   * pays its rent (~0.00086 SOL); a wallet that cannot cover that AND stay
+   * rent-exempt itself fails with InsufficientFundsForRent on account 0.
+   *
+   * This was reported to a real user as "the network refused that transaction"
+   * — the -32002 catch-all below swallowed it — and cost two wallet approvals
+   * and a chain simulation to identify. Name the actual problem.
+   */
+  if (/InsufficientFundsForRent/i.test(raw)) {
+    return 'Not enough SOL in your wallet to cover the network rent for this action.';
+  }
   if (/insufficient funds|InsufficientFunds|0x1$/i.test(raw)) return 'Not enough SKR for the entry fee.';
   if (/already in use|AccountAlreadyInitialized/i.test(raw)) return 'You have already done that in this round.';
   if (/SelfVote/i.test(raw)) return 'You cannot vote for your own entry.';

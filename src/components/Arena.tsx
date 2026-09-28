@@ -152,8 +152,21 @@ function Today({
   const left = useCountdown(arena.endsAt);
   // Only images can be entered: the gallery is judged in a second, and a video
   // nobody plays is an entry nobody votes for.
+  /**
+   * NEWEST FIRST. The image you are about to stake is almost always the one you
+   * just made, and it was last in a horizontal scroller — so the obvious tap
+   * landed on an older result. That is how a failed generation got staked into
+   * a live round for 4 SKR, and the program writes `media_uri` once, so there
+   * is no undo: the entry PDA is keyed by (round, entrant) and `enter` cannot
+   * be called twice.
+   */
   const enterable = useMemo(
-    () => results.filter((r) => Boolean(r.url) && (r.contentType ?? '').startsWith('image/')).slice(0, 12),
+    () =>
+      results
+        .filter((r) => Boolean(r.url) && (r.contentType ?? '').startsWith('image/'))
+        .slice()
+        .reverse()
+        .slice(0, 12),
     [results],
   );
   const [picked, setPicked] = useState<string | null>(null);
