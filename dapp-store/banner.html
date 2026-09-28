@@ -1,0 +1,67 @@
+<!doctype html><html><head><meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1200px;height:600px;overflow:hidden}
+  body{
+    background:#08080b;
+    font-family:'IBM Plex Sans',sans-serif;color:#f4f4f5;
+    position:relative;
+  }
+  /* warm glow, same language as the app's map and the deck */
+  .glow{position:absolute;inset:0;
+    background:
+      radial-gradient(760px 520px at 16% 46%, rgba(245,158,11,.20), transparent 62%),
+      radial-gradient(520px 420px at 92% 88%, rgba(220,38,38,.14), transparent 65%);}
+  .grid{position:absolute;inset:0;opacity:.35;
+    background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:48px 48px;}
+  .wrap{position:relative;height:100%;display:flex;align-items:center;gap:28px;padding:0 54px}
+  .copy{width:520px;flex:none}
+  h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:60px;
+     line-height:.98;letter-spacing:-.035em}
+  h1 .p{display:block;background:linear-gradient(92deg,#fbbf24,#f97316 58%,#ef4444);
+        -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{margin-top:18px;font-size:21px;line-height:1.45;color:#b9b9c2;max-width:30ch}
+  .tags{margin-top:26px;display:flex;gap:10px}
+  .tag{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:.02em;
+       padding:9px 14px;border-radius:9px;border:1px solid #2c2c33;color:#a1a1aa}
+  .tag.hot{border-color:#7c4d12;color:#fbbf24}
+  /* the transformation, which is the product in one look */
+  .shots{position:relative;flex:1;height:600px;display:flex;align-items:center;justify-content:flex-end;gap:18px}
+  figure{position:relative;border-radius:16px;overflow:hidden;border:2px solid #26262d;
+         box-shadow:0 26px 60px rgba(0,0,0,.6)}
+  figure img{display:block;width:100%;height:100%;object-fit:cover}
+  .a{width:196px;height:256px;transform:rotate(-2.2deg)}
+  .b{width:232px;height:300px;transform:rotate(2deg);border-color:#7c4d12}
+  figcaption{position:absolute;left:0;right:0;bottom:0;padding:8px 10px;
+    font-family:'JetBrains Mono',monospace;font-size:12px;color:#e6e6ea;
+    background:linear-gradient(transparent,rgba(0,0,0,.82) 42%)}
+  .arrow{font-family:'JetBrains Mono',monospace;font-size:15px;color:#fbbf24;
+    display:flex;flex-direction:column;align-items:center;gap:6px;flex:none}
+  .arrow b{font-size:22px}
+  .price{position:absolute;top:150px;right:34px;font-family:'JetBrains Mono',monospace;
+    font-size:15px;font-weight:700;color:#0a0a0d;background:#fbbf24;
+    padding:7px 12px;border-radius:8px;transform:rotate(2deg)}
+</style></head><body>
+<div class="glow"></div><div class="grid"></div>
+<div class="wrap">
+  <div class="copy">
+    <h1>Gliana Agent<span class="p">Pay per result.</span></h1>
+    <p class="sub">Photograph something. The agent picks the model, quotes the price, and you approve once — from your own wallet.</p>
+    <div class="tags">
+      <span class="tag hot">116 models</span>
+      <span class="tag">USDC on Solana</span>
+      <span class="tag">no account</span>
+    </div>
+  </div>
+  <div class="shots">
+    <figure class="a"><img src="before.jpg" /><figcaption>your desk</figcaption></figure>
+    <div class="arrow"><b>&rarr;</b><span>4.8&cent;</span></div>
+    <figure class="b"><img src="after.png" /><figcaption>flux-1-kontext-pro</figcaption></figure>
+  </div>
+</div>
+</body></html>
