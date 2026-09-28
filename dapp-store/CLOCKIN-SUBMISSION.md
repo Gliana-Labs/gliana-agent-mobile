@@ -97,10 +97,23 @@ its own Anchor program, live on mainnet:
   round    26NzNADwFt42BtN2rHbTmzEopDgBeJVwzRKsFwGaAkPe
   vault    BguTAwYYPj2JBRDBFqmYRLqE2RTJsEYrLb2yvyq4xRZn
 
+ONE GLOBAL ROUND A DAY. There is no matchmaking and there are no lobbies: the
+round's PDA is derived from the day number alone, so every phone that opens the
+app resolves the same round, the same theme, the same pot and the same gallery.
+Everyone is in one contest against everyone else, and the pot grows with the
+number of players.
+
+Entry is also PERMISSIONLESS. The app is one client; anyone who can call the
+program can enter — another client, a script, an agent. One entry per wallet is
+enforced by the Entry PDA being keyed on (round, entrant), and one vote per
+wallet by the existence of a Vote PDA, not by anything we track.
+
 The loop: photograph today's theme, restyle it with any of the 116 models the
 app sells (paid in USDC, unchanged), then stake 5 SKR to enter that result.
 Voting is free and one per wallet. When the day ends the pot pays 60% to the
 winner, 25% across places 2-5, and 15% to everyone who voted for the winner.
+Rounds roll at 19:00 WIB rather than midnight UTC, because a global daily round
+that closes at 07:00 local pays out while its players are asleep.
 
 Four things make it a real integration rather than a token sticker:
 
