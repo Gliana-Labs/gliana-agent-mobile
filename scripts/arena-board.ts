@@ -16,7 +16,7 @@ async function main() {
   }
   console.log(`${rows.length} player(s)\n`);
   rows.forEach((r, i) =>
-    console.log(`${String(i + 1).padStart(2)}  ${shortAddress(r.entrant)}  wins ${r.wins}  finishes ${r.places}  votes ${r.votes}`),
+    console.log(`${String(i + 1).padStart(2)}  ${shortAddress(r.entrant)}  wins ${r.wins}  won ${Number(r.won) / 1e6} SKR  finishes ${r.places}  votes ${r.votes}`),
   );
 }
 void main();

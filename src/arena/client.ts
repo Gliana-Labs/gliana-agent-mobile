@@ -376,6 +376,9 @@ const decodeBase64 = (b64: string) => new Uint8Array(Buffer.from(b64, 'base64'))
 // in the program: 8 discriminator + 8 id + 32*3 keys + 4 + 80 theme + 8 fee
 // + 8 ends_at + 4 count + 1 settled + 1 bump + 32*5 top + 4*5 top_votes.
 const ROUND_SPACE = 398;
+// Entry::SPACE: 8 discriminator + 32 round + 32 entrant + 4 + 200 uri + 4 votes
+// + 8 created_at + 1 paid + 1 bump + 8 paid_fee.
+const ENTRY_SPACE = 298;
 /** An unset Pubkey — what `top` holds for places nobody has taken. */
 const DEFAULT_PUBKEY = '11111111111111111111111111111111' as Address;
 
@@ -385,6 +388,7 @@ export interface Standing {
   wins: number;      // rounds where this wallet held place 1 when the round ended
   places: number;    // top-five finishes, place 1 included
   votes: number;     // votes its winning entries drew
+  won: bigint;       // the winner's share of every pot it took, in SKR base units
 }
 
 /**
@@ -395,67 +399,77 @@ export interface Standing {
  * a redeploy, so the ranking is derived on the client instead — the inputs are
  * still on-chain, and a wrong tally here cannot move anyone's money.
  *
- * Round is a fixed-size account, so `dataSize` finds every one of them without
- * needing a discriminator filter. Only rounds that have ENDED are counted: a
- * live round's `top` changes with every vote, and showing a crown that moves
- * during the day reads as a bug.
+ * Both accounts are fixed-size, so `dataSize` identifies each kind without a
+ * discriminator filter. Fetching every Entry once gives us BOTH the entry →
+ * wallet mapping and each round's pot, so there is no getMultipleAccounts pass.
+ *
+ * Only rounds that have ENDED are counted: a live round's `top` changes with
+ * every vote, and a crown that moves during the day reads as a bug.
+ *
+ * ON `won`. The pot is summed from what entrants actually paid (`paid_fee`,
+ * which is face value or the holder rate), and the winner's share is
+ * WINNER_BPS. That is the share the program OWES place 1 — `claim_place`
+ * computes the transfer from the vault balance at claim time, so if a runner-up
+ * claims first the winner's actual transfer is smaller. The amount paid is not
+ * stored on chain (only `paid`), so this is the defined share, not a settled
+ * receipt, and the UI says so.
  */
-export async function fetchStandings(now = Math.floor(Date.now() / 1000)): Promise<Standing[]> {
-  const { value: accounts } = await rpc
-    .getProgramAccounts(PROGRAM_ADDRESS, { encoding: 'base64', withContext: true, filters: [{ dataSize: BigInt(ROUND_SPACE) }] })
-    .send();
+const WINNER_BPS = 6000n;
 
-  const decoder = getRoundDecoder();
+export async function fetchStandings(now = Math.floor(Date.now() / 1000)): Promise<Standing[]> {
+  const [roundAccounts, entryAccounts] = await Promise.all([
+    rpc.getProgramAccounts(PROGRAM_ADDRESS, { encoding: 'base64', withContext: true, filters: [{ dataSize: BigInt(ROUND_SPACE) }] }).send(),
+    rpc.getProgramAccounts(PROGRAM_ADDRESS, { encoding: 'base64', withContext: true, filters: [{ dataSize: BigInt(ENTRY_SPACE) }] }).send(),
+  ]);
+
+  const roundDec = getRoundDecoder();
   const ended: Round[] = [];
-  for (const acc of accounts) {
+  for (const acc of roundAccounts.value) {
     try {
-      const r = decoder.decode(decodeBase64(acc.account.data[0]));
+      const r = roundDec.decode(decodeBase64(acc.account.data[0]));
       if (Number(r.endsAt) <= now && r.entryCount > 0) ended.push(r);
     } catch {
-      /* not a Round — skip */
+      /* not a Round — on-chain bytes are untrusted input */
     }
   }
   if (ended.length === 0) return [];
 
-  // Every placed entry across every ended round, resolved in ONE call. `top`
-  // holds ENTRY keys, and the wallet lives inside the Entry account.
-  const placed: { entry: Address; place: number; votes: number }[] = [];
-  for (const r of ended) {
-    r.top.forEach((entry, i) => {
-      if (entry !== DEFAULT_PUBKEY && r.topVotes[i] > 0) placed.push({ entry, place: i + 1, votes: r.topVotes[i] });
-    });
-  }
-  const keys = [...new Set(placed.map((p) => p.entry))];
+  const entryDec = getEntryDecoder();
   const entrantOf = new Map<string, Address>();
-  const entryDecoder = getEntryDecoder();
-  // getMultipleAccounts caps at 100 keys per call.
-  for (let i = 0; i < keys.length; i += 100) {
-    const slice = keys.slice(i, i + 100);
-    const { value } = await rpc.getMultipleAccounts(slice, { encoding: 'base64' }).send();
-    value.forEach((acc, j) => {
-      if (!acc) return;
-      try {
-        entrantOf.set(slice[j], entryDecoder.decode(decodeBase64(acc.data[0])).entrant);
-      } catch {
-        /* not an Entry — skip */
-      }
-    });
+  const potOf = new Map<string, bigint>();
+  for (const acc of entryAccounts.value) {
+    try {
+      const e = entryDec.decode(decodeBase64(acc.account.data[0]));
+      entrantOf.set(acc.pubkey, e.entrant);
+      potOf.set(e.round, (potOf.get(e.round) ?? 0n) + e.paidFee);
+    } catch {
+      /* not an Entry — skip */
+    }
   }
 
+  // Entries key their pot by the round PDA, and a decoded Round does not carry
+  // its own address — derive them once, before the tally.
+  const pdas = await Promise.all(ended.map((r) => roundAddress(r.roundId)));
+
   const by = new Map<string, Standing>();
-  for (const p of placed) {
-    const who = entrantOf.get(p.entry);
-    if (!who) continue;
-    const cur = by.get(who) ?? { entrant: who, wins: 0, places: 0, votes: 0 };
-    cur.places += 1;
-    if (p.place === 1) {
-      cur.wins += 1;
-      cur.votes += p.votes;
-    }
-    by.set(who, cur);
-  }
-  // Wins first, then the votes those wins drew, then breadth of finishes.
-  return [...by.values()].sort((a, b) => b.wins - a.wins || b.votes - a.votes || b.places - a.places);
+  ended.forEach((r, ri) => {
+    const roundKey = pdas[ri][0];
+    r.top.forEach((entry, i) => {
+      if (entry === DEFAULT_PUBKEY || r.topVotes[i] === 0) return;
+      const who = entrantOf.get(entry);
+      if (!who) return;
+      const cur = by.get(who) ?? { entrant: who, wins: 0, places: 0, votes: 0, won: 0n };
+      cur.places += 1;
+      if (i === 0) {
+        cur.wins += 1;
+        cur.votes += r.topVotes[i];
+        cur.won += ((potOf.get(roundKey) ?? 0n) * WINNER_BPS) / 10_000n;
+      }
+      by.set(who, cur);
+    });
+  });
+  // Wins first, then what those wins were worth, then breadth of finishes.
+  return [...by.values()].sort((a, b) => b.wins - a.wins || Number(b.won - a.won) || b.places - a.places);
 }
 
 export const shortAddress = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;

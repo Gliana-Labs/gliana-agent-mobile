@@ -91,9 +91,11 @@ export function Arena({
               }}
               style={[styles.tab, tab === t && styles.tabOn]}
             >
-              <Text style={[styles.tabText, tab === t && styles.tabTextOn]}>
+              {/* One line, always: a fourth tab left the count wrapping under
+                  the word, which read as a broken label rather than a badge. */}
+              <Text numberOfLines={1} style={[styles.tabText, tab === t && styles.tabTextOn]}>
                 {t === 'today' ? 'Today' : t === 'gallery' ? 'Gallery' : t === 'board' ? 'Board' : 'You'}
-                {t === 'gallery' && arena.entries.length > 0 ? `  ${arena.entries.length}` : ''}
+                {t === 'gallery' && arena.entries.length > 0 ? ` ${arena.entries.length}` : ''}
               </Text>
             </Pressable>
           ))}
@@ -591,7 +593,7 @@ function Board({ me, onGoToday }: { me: string | null; onGoToday: () => void }) 
         <Text style={styles.label}>ALL-TIME</Text>
         <Text style={styles.meta}>
           Counted from the chain across {rows.length} {rows.length === 1 ? 'player' : 'players'}. Wins first,
-          then the votes those wins drew.
+          then what those wins were worth. Winnings are the winner's 60% share of each pot.
         </Text>
       </Card>
 
@@ -633,7 +635,8 @@ function Row({ rank, row, isMe }: { rank: number; row: Standing; isMe: boolean }
           {isMe ? '  you' : ''}
         </Text>
         <Text style={styles.meta}>
-          {row.places} {row.places === 1 ? 'finish' : 'finishes'} · {row.votes} {row.votes === 1 ? 'vote' : 'votes'}
+          {skr(row.won)} SKR won · {row.places} {row.places === 1 ? 'finish' : 'finishes'} · {row.votes}{' '}
+          {row.votes === 1 ? 'vote' : 'votes'}
         </Text>
       </View>
       <View style={styles.boardWins}>
@@ -777,9 +780,9 @@ const styles = StyleSheet.create({
     borderWidth: px.border,
     borderColor: colors.border,
   },
-  tab: { flex: 1, paddingVertical: space(2.5), borderRadius: 2, alignItems: 'center' },
+  tab: { flex: 1, paddingVertical: space(2.5), paddingHorizontal: space(0.5), borderRadius: 2, alignItems: 'center' },
   tabOn: { backgroundColor: colors.surfaceStrong },
-  tabText: { color: colors.textDim, fontSize: 9, fontFamily: font.pixel },
+  tabText: { color: colors.textDim, fontSize: 8, fontFamily: font.pixel },
   tabTextOn: { color: colors.text },
 
   list: { padding: space(3), paddingBottom: space(10) },
