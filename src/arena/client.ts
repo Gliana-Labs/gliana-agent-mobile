@@ -372,6 +372,92 @@ export async function claimPlace(
 const decodeBase64 = (b64: string) => new Uint8Array(Buffer.from(b64, 'base64'));
 
 /** Short form for display: `7xKX…mBvf`. */
+// Round is fixed-size, so `dataSize` alone identifies it. Mirrors Round::SPACE
+// in the program: 8 discriminator + 8 id + 32*3 keys + 4 + 80 theme + 8 fee
+// + 8 ends_at + 4 count + 1 settled + 1 bump + 32*5 top + 4*5 top_votes.
+const ROUND_SPACE = 398;
+/** An unset Pubkey — what `top` holds for places nobody has taken. */
+const DEFAULT_PUBKEY = '11111111111111111111111111111111' as Address;
+
+/** One wallet's standing across every round that has ever ended. */
+export interface Standing {
+  entrant: Address;
+  wins: number;      // rounds where this wallet held place 1 when the round ended
+  places: number;    // top-five finishes, place 1 included
+  votes: number;     // votes its winning entries drew
+}
+
+/**
+ * The all-time board, built from the chain in two calls.
+ *
+ * The program has no per-player account: `Round` carries `top[5]` and nothing
+ * aggregates across rounds. Adding a Player PDA would mean a program change and
+ * a redeploy, so the ranking is derived on the client instead — the inputs are
+ * still on-chain, and a wrong tally here cannot move anyone's money.
+ *
+ * Round is a fixed-size account, so `dataSize` finds every one of them without
+ * needing a discriminator filter. Only rounds that have ENDED are counted: a
+ * live round's `top` changes with every vote, and showing a crown that moves
+ * during the day reads as a bug.
+ */
+export async function fetchStandings(now = Math.floor(Date.now() / 1000)): Promise<Standing[]> {
+  const { value: accounts } = await rpc
+    .getProgramAccounts(PROGRAM_ADDRESS, { encoding: 'base64', withContext: true, filters: [{ dataSize: BigInt(ROUND_SPACE) }] })
+    .send();
+
+  const decoder = getRoundDecoder();
+  const ended: Round[] = [];
+  for (const acc of accounts) {
+    try {
+      const r = decoder.decode(decodeBase64(acc.account.data[0]));
+      if (Number(r.endsAt) <= now && r.entryCount > 0) ended.push(r);
+    } catch {
+      /* not a Round — skip */
+    }
+  }
+  if (ended.length === 0) return [];
+
+  // Every placed entry across every ended round, resolved in ONE call. `top`
+  // holds ENTRY keys, and the wallet lives inside the Entry account.
+  const placed: { entry: Address; place: number; votes: number }[] = [];
+  for (const r of ended) {
+    r.top.forEach((entry, i) => {
+      if (entry !== DEFAULT_PUBKEY && r.topVotes[i] > 0) placed.push({ entry, place: i + 1, votes: r.topVotes[i] });
+    });
+  }
+  const keys = [...new Set(placed.map((p) => p.entry))];
+  const entrantOf = new Map<string, Address>();
+  const entryDecoder = getEntryDecoder();
+  // getMultipleAccounts caps at 100 keys per call.
+  for (let i = 0; i < keys.length; i += 100) {
+    const slice = keys.slice(i, i + 100);
+    const { value } = await rpc.getMultipleAccounts(slice, { encoding: 'base64' }).send();
+    value.forEach((acc, j) => {
+      if (!acc) return;
+      try {
+        entrantOf.set(slice[j], entryDecoder.decode(decodeBase64(acc.data[0])).entrant);
+      } catch {
+        /* not an Entry — skip */
+      }
+    });
+  }
+
+  const by = new Map<string, Standing>();
+  for (const p of placed) {
+    const who = entrantOf.get(p.entry);
+    if (!who) continue;
+    const cur = by.get(who) ?? { entrant: who, wins: 0, places: 0, votes: 0 };
+    cur.places += 1;
+    if (p.place === 1) {
+      cur.wins += 1;
+      cur.votes += p.votes;
+    }
+    by.set(who, cur);
+  }
+  // Wins first, then the votes those wins drew, then breadth of finishes.
+  return [...by.values()].sort((a, b) => b.wins - a.wins || b.votes - a.votes || b.places - a.places);
+}
+
 export const shortAddress = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export { getBase58Decoder, decodeEntry };

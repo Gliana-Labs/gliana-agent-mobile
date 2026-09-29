@@ -56,7 +56,8 @@
     "web": "expo start --web",
     "postinstall": "patch-package",
     "arena:smoke": "tsx scripts/arena-smoke.ts",
-    "arena:state": "tsx scripts/arena-state.ts"
+    "arena:state": "tsx scripts/arena-state.ts",
+    "arena:board": "tsx scripts/arena-board.ts"
   },
   "private": true
 }

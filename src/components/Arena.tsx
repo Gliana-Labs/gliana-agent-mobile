@@ -18,7 +18,7 @@
  *    4.1:1 on this background and textGhost 2.5:1, which is decoration, not text.
  *  - Numbers that change under the eye are tabular.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -35,13 +35,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWallet } from '../lib/mwa';
 import { colors, font, radius, space } from '../theme';
 import { useArena, HOLDER_THRESHOLD, type Placing } from '../arena/useArena';
-import { shortAddress, type EntryWithAddress } from '../arena/client';
+import { fetchStandings, shortAddress, type EntryWithAddress, type Standing } from '../arena/client';
 import { CLUSTER, skr } from '../arena/config';
 import { Chip, Pot, Press, Rank, ThemeCard, WinBanner, tapSelect, PIXEL, px } from './arena/bits';
 import { isMuted, play, setMuted } from '../lib/sfx';
 import type { GenerationResult } from '../types';
 
-type Tab = 'today' | 'gallery' | 'you';
+type Tab = 'today' | 'gallery' | 'board' | 'you';
 
 export function Arena({
   visible,
@@ -82,7 +82,7 @@ export function Arena({
 
         {/* Selection is surface, not colour — amber is reserved for money. */}
         <View style={styles.tabs}>
-          {(['today', 'gallery', 'you'] as Tab[]).map((t) => (
+          {(['today', 'gallery', 'board', 'you'] as Tab[]).map((t) => (
             <Pressable
               key={t}
               onPress={() => {
@@ -92,7 +92,7 @@ export function Arena({
               style={[styles.tab, tab === t && styles.tabOn]}
             >
               <Text style={[styles.tabText, tab === t && styles.tabTextOn]}>
-                {t === 'today' ? 'Today' : t === 'gallery' ? 'Gallery' : 'You'}
+                {t === 'today' ? 'Today' : t === 'gallery' ? 'Gallery' : t === 'board' ? 'Board' : 'You'}
                 {t === 'gallery' && arena.entries.length > 0 ? `  ${arena.entries.length}` : ''}
               </Text>
             </Pressable>
@@ -121,6 +121,8 @@ export function Arena({
           />
         ) : tab === 'gallery' ? (
           <Gallery arena={arena} me={account?.address ?? null} />
+        ) : tab === 'board' ? (
+          <Board me={account?.address ?? null} onGoToday={() => setTab('today')} />
         ) : (
           <You arena={arena} address={account?.address ?? null} onGoToday={() => setTab('today')} />
         )}
@@ -533,6 +535,115 @@ function SoundRow() {
 
 // ── bits ───────────────────────────────────────────────────────────────────
 
+
+// ── Board ──────────────────────────────────────────────────────────────────
+
+/**
+ * All-time standings, across every round that has ended.
+ *
+ * Deliberately NOT a live board. A round's `top` moves with every vote, so a
+ * crown that changes while you watch reads as a bug rather than a contest;
+ * only ended rounds are counted, and today's result lands when the day does.
+ *
+ * Your own row is pinned below the list when you are outside the top ten. A
+ * leaderboard you cannot find yourself on is a wall of strangers.
+ */
+function Board({ me, onGoToday }: { me: string | null; onGoToday: () => void }) {
+  const [rows, setRows] = useState<Standing[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const load = useCallback(async () => {
+    setFailed(false);
+    try {
+      setRows(await fetchStandings());
+    } catch {
+      setFailed(true);
+    }
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (failed) return <Empty text="Could not read the board. Pull to retry." />;
+  if (!rows) return <Empty text="Reading the chain…" />;
+  if (rows.length === 0)
+    return (
+      <Scroll onRefresh={load}>
+        <Card>
+          <Text style={styles.title}>No round has ended yet</Text>
+          <Text style={styles.meta}>
+            The board fills in when the first round closes. Win one and you open it.
+          </Text>
+          <Press onPress={onGoToday} haptic="none" style={styles.linkRow}>
+            <Text style={styles.link}>Enter today's round →</Text>
+          </Press>
+        </Card>
+      </Scroll>
+    );
+
+  const top = rows.slice(0, 10);
+  const myIndex = me ? rows.findIndex((r) => r.entrant === me) : -1;
+  const meBelow = myIndex >= top.length ? rows[myIndex] : null;
+
+  return (
+    <Scroll onRefresh={load}>
+      <Card>
+        <Text style={styles.label}>ALL-TIME</Text>
+        <Text style={styles.meta}>
+          Counted from the chain across {rows.length} {rows.length === 1 ? 'player' : 'players'}. Wins first,
+          then the votes those wins drew.
+        </Text>
+      </Card>
+
+      <Card>
+        {top.map((r, i) => (
+          <Row key={r.entrant} rank={i + 1} row={r} isMe={r.entrant === me} />
+        ))}
+      </Card>
+
+      {meBelow ? (
+        <Card>
+          <Text style={styles.label}>YOU</Text>
+          <Row rank={myIndex + 1} row={meBelow} isMe />
+        </Card>
+      ) : null}
+
+      {me && myIndex < 0 ? (
+        <Card>
+          <Text style={styles.title}>You are not on the board</Text>
+          <Text style={styles.meta}>A top-five finish in any round puts you here.</Text>
+          <Press onPress={onGoToday} haptic="none" style={styles.linkRow}>
+            <Text style={styles.link}>Enter today's round →</Text>
+          </Press>
+        </Card>
+      ) : null}
+    </Scroll>
+  );
+}
+
+/** One standing. The medal is drawn for the first three and nowhere else. */
+function Row({ rank, row, isMe }: { rank: number; row: Standing; isMe: boolean }) {
+  const medal = rank === 1 ? '#fbbf24' : rank === 2 ? '#d4d4d8' : rank === 3 ? '#b45309' : null;
+  return (
+    <View style={[styles.boardRow, isMe && styles.boardRowMe]}>
+      <Text style={[styles.boardRank, styles.tnum, medal ? { color: medal } : null]}>{rank}</Text>
+      <View style={styles.boardWho}>
+        <Text style={styles.value} numberOfLines={1}>
+          {shortAddress(row.entrant)}
+          {isMe ? '  you' : ''}
+        </Text>
+        <Text style={styles.meta}>
+          {row.places} {row.places === 1 ? 'finish' : 'finishes'} · {row.votes} {row.votes === 1 ? 'vote' : 'votes'}
+        </Text>
+      </View>
+      <View style={styles.boardWins}>
+        <Text style={[styles.display, styles.tnum, styles.boardWinsNum]}>{row.wins}</Text>
+        <Text style={styles.meta}>{row.wins === 1 ? 'win' : 'wins'}</Text>
+      </View>
+    </View>
+  );
+}
+
 const Scroll = ({ children, onRefresh }: { children: React.ReactNode; onRefresh: () => Promise<void> }) => (
   <FlatList
     data={[]}
@@ -637,6 +748,20 @@ const styles = StyleSheet.create({
   value: { color: colors.text, fontSize: 11, fontFamily: font.pixel },
   meta: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   tnum: { fontVariant: ['tabular-nums'] },
+  boardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space(3),
+    paddingVertical: space(2.5),
+    borderTopWidth: 1,
+    borderTopColor: colors.borderFaint,
+  },
+  // Your own row is tinted, not outlined: an outline competes with the medal.
+  boardRowMe: { backgroundColor: colors.surfaceStrong, marginHorizontal: -space(3), paddingHorizontal: space(3) },
+  boardRank: { width: 28, color: colors.textDim, fontSize: 15, fontFamily: font.pixel },
+  boardWho: { flex: 1, minWidth: 0 },
+  boardWins: { alignItems: 'flex-end', minWidth: 52 },
+  boardWinsNum: { fontSize: 26 },
   link: { color: colors.flameSoft, fontSize: 9, fontFamily: font.pixel, lineHeight: 16 },
   linkRow: { alignSelf: 'flex-start', paddingVertical: space(2) },
   hair: { borderTopWidth: 1, borderTopColor: colors.borderFaint, paddingTop: space(2) },
