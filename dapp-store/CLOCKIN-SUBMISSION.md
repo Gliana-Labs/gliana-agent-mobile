@@ -4,6 +4,39 @@ Paste-ready. Every claim is verifiable on-chain or in the repo.
 
 ---
 
+## THE PROBLEM
+
+Every generative AI app sells by the month, to people with accounts. That suits
+someone who uses AI daily. It fits nobody who wants **one image**, and it fits
+**no software agent at all** — an agent cannot fill in a signup form, hold a
+subscription, or own a credit card.
+
+On a phone the mismatch is sharper. You are three taps from a camera and eleven
+from an account, so the thing people would actually pay for — point at this,
+make it something else — dies in the signup.
+
+**Who this is for.** Two users with the same unmet need:
+
+- **People who want one result, not a plan.** Students, sellers listing a
+  product, anyone for whom a $20/month floor is more than the job is worth.
+  Indonesia is the first market: card penetration is low, subscriptions are a
+  hard sell, and a wallet is not.
+- **Autonomous agents.** An agent with a wallet can buy a single inference
+  without a human creating an account for it. That market has no incumbent.
+
+**Why this beats the existing apps.** Not model quality — we resell the same
+frontier models. The difference is the *unit*: one call, priced before it runs,
+paid from your own wallet, with nothing held on your behalf. A failed request
+costs nothing because settlement happens after the model succeeds.
+
+**What would prove it works.** Paid calls from wallets that are not ours, and
+Arena rounds whose entries we did not seed. Today the honest number is small
+and we say so on the deck's verification slide rather than claiming traction we
+do not have. The measurable target is the first week where external entries
+outnumber seeded ones.
+
+---
+
 ## PROJECT TITLE
 ```
 Gliana Agent

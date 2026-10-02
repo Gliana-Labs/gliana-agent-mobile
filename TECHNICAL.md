@@ -14,6 +14,67 @@ no account, no API key, each call paid from the caller's own wallet. Gliana
 Agent is the Android client for the half of that API a laptop cannot reach — the
 camera — plus a daily on-chain contest that only exists on the phone.
 
+## One paid call, end to end
+
+```
+  PHONE (this repo)                    SERVER (closed)            CHAIN / PROVIDER
+  ─────────────────────────────────────────────────────────────────────────────────
+  camera / prompt
+        │
+        │ 1. POST /v1/infer {model, input}      no key, no account
+        ├──────────────────────────────────▶ gateway
+        │                                        │ catalogue lookup, 404 unknown id
+        │                                        │ price = rate x margin x units
+        │                                        │ PRE-CHARGE GUARDS: required
+        │                                        │ fields, one-of, dead file URLs
+        │ 2. 402 + WWW-Authenticate: Payment     │
+        │◀──────────────────────────────────────┘ nothing charged yet
+        │
+        │ 3. price card shown, user taps once
+        │ 4. Mobile Wallet Adapter / Seed Vault
+        ├────────────────────────────────▶ wallet app   signs USDC transfer
+        │◀──────────────────────────────── signed wire tx (used VERBATIM)
+        │
+        │ 5. retry with payment proof
+        ├──────────────────────────────────▶ gateway
+        │                                        ├──▶ verify  ──────▶ facilitator
+        │                                        ├──▶ RUN MODEL ───▶ provider
+        │                                        ├──▶ settle  ──────▶ chain
+        │                                        │    (run BEFORE settle: a model
+        │                                        │     that fails costs nothing)
+        │ 6. 200 {output, costMicroUsd, receipt} │
+        │◀──────────────────────────────────────┘
+        ▼
+  result saved to gallery            ──────▶  optionally staked in the Arena
+                                              (Anchor program, SKR, mainnet)
+```
+
+**On-device vs server.** The phone holds the private key and never sends it: the
+wallet signs, and we submit the wallet's own bytes without re-serialising them.
+Everything else — catalogue, pricing, model routing, provider credentials — is
+server-side, because an API key shipped in an APK is a published API key. Image
+resize to 1280px happens on-device, before upload, which is what took the
+shutter-to-card path to ~6s.
+
+**Custody.** None. Payment settles from the caller's wallet to our payTo address
+in one transaction; we never hold a balance, and there is nothing to withdraw.
+The Arena's pot is a token account owned by the round's PDA — only program
+instructions move it, and `claim_place` is permissionless, so pots pay out even
+if we disappear.
+
+**Failure and retries.** The 402 is free and repeatable: a request rejected by
+the pre-charge guards never reaches a provider. After payment, the model runs
+*before* settlement, so a provider error returns 402 `settlement_failed` with no
+USDC moved. Wallet authorisations that go stale are repaired rather than
+surfaced as a payment failure. The blockhash is fetched fresh at signing time —
+the server's challenge blockhash is already seconds old, and MWA approval adds
+15-60s, which expires the transaction in the mempool.
+
+**Pricing is a ceiling, never an estimate.** Video bills maximum duration and the
+highest resolution tier when unset; LLM chat bills estimated input plus
+`max_tokens`. Undercharging on a dynamic price loses real money, so the quote is
+always the worst case.
+
 ## Component boundaries
 
 | Component | Where | Source |
