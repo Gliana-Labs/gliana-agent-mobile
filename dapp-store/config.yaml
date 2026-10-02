@@ -61,25 +61,16 @@ release:
         Point the camera at something to restyle it, or stake what you made in the
         daily Arena and vote on everyone else's.
       new_in_version: >
-        The app now opens on a pixel overworld you walk around, not a text box.
-        Four places: the Studio for any model, SNAP for your camera, the Arena
-        for the daily contest, and your profile.
+        The Arena now has an all-time board. Every wallet that has ever placed is
+        ranked by wins, and by what those wins were worth in SKR. It is counted
+        from the chain rather than from this device, so a reinstall never costs
+        you your record, and your own row is pinned below the list when you are
+        outside the top ten.
 
 
-        SNAP is new — point the camera at something real and restyle it without
-        leaving the app, using an in-app viewfinder rather than a trip to the
-        system camera. Each day carries a photo quest with its own theme.
-
-
-        The Arena is live on Solana mainnet with real SKR. Stake to enter the
-        day's theme, vote for free, and the pot pays out from an on-chain vault
-        that only the program can move. Holding SKR earns a discount the chain
-        verifies, and payouts can be claimed by anyone once a round closes.
-
-
-        Smaller things: the proposal card reads as a receipt instead of a
-        parameter dump, a dead wallet authorization repairs itself instead of
-        failing your payment, and arcade sound can be muted from the profile.
+        Payouts are fairer too. Each place is now paid from the pot as it stood
+        when the round closed, so the order people claim in no longer changes
+        what anyone receives.
       saga_features: Pay-per-result with Mobile Wallet Adapter (Seed Vault).
       android_details:
         - Native Android app built for Seeker — payments via Mobile Wallet
