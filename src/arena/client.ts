@@ -372,13 +372,35 @@ export async function claimPlace(
 const decodeBase64 = (b64: string) => new Uint8Array(Buffer.from(b64, 'base64'));
 
 /** Short form for display: `7xKX…mBvf`. */
-// Round is fixed-size, so `dataSize` alone identifies it. Mirrors Round::SPACE
-// in the program: 8 discriminator + 8 id + 32*3 keys + 4 + 80 theme + 8 fee
-// + 8 ends_at + 4 count + 1 settled + 1 bump + 32*5 top + 4*5 top_votes
-// + 8 pot. Rounds created before the pot snapshot shipped are 398 bytes and
-// will not match this filter — they are invisible to the board by design,
-// because the new Round layout cannot decode them either.
+// Round is fixed-size, so `dataSize` alone identifies it. Mirrors Round::SPACE:
+// 8 discriminator + 8 id + 32*3 keys + 4 + 80 theme + 8 fee + 8 ends_at
+// + 4 count + 1 settled + 1 bump + 32*5 top + 4*5 top_votes + 8 pot.
+//
+// BOTH sizes are queried. `pot` was appended when the payout snapshot shipped,
+// so rounds opened before that upgrade are 8 bytes shorter. Filtering on the
+// new size alone would have shown an empty board until the first new round
+// opened, and silently dropped every past result after that.
 const ROUND_SPACE = 406;
+const ROUND_SPACE_LEGACY = 398;
+
+/**
+ * Decode a Round, tolerating the pre-snapshot layout.
+ *
+ * `pot` is the last field, so an old account is exactly the new one minus its
+ * trailing u64 — zero-padding it decodes correctly and yields pot = 0, which is
+ * what "never snapshotted" means anyway.
+ */
+function decodeRoundTolerant(bytes: Uint8Array): Round {
+  const data =
+    bytes.length === ROUND_SPACE_LEGACY
+      ? (() => {
+          const padded = new Uint8Array(ROUND_SPACE);
+          padded.set(bytes);
+          return padded;
+        })()
+      : bytes;
+  return getRoundDecoder().decode(data);
+}
 // Entry::SPACE: 8 discriminator + 32 round + 32 entrant + 4 + 200 uri + 4 votes
 // + 8 created_at + 1 paid + 1 bump + 8 paid_fee.
 const ENTRY_SPACE = 298;
@@ -420,16 +442,16 @@ export interface Standing {
 const WINNER_BPS = 6000n;
 
 export async function fetchStandings(now = Math.floor(Date.now() / 1000)): Promise<Standing[]> {
-  const [roundAccounts, entryAccounts] = await Promise.all([
+  const [roundAccounts, legacyRoundAccounts, entryAccounts] = await Promise.all([
     rpc.getProgramAccounts(PROGRAM_ADDRESS, { encoding: 'base64', withContext: true, filters: [{ dataSize: BigInt(ROUND_SPACE) }] }).send(),
+    rpc.getProgramAccounts(PROGRAM_ADDRESS, { encoding: 'base64', withContext: true, filters: [{ dataSize: BigInt(ROUND_SPACE_LEGACY) }] }).send(),
     rpc.getProgramAccounts(PROGRAM_ADDRESS, { encoding: 'base64', withContext: true, filters: [{ dataSize: BigInt(ENTRY_SPACE) }] }).send(),
   ]);
 
-  const roundDec = getRoundDecoder();
   const ended: Round[] = [];
-  for (const acc of roundAccounts.value) {
+  for (const acc of [...roundAccounts.value, ...legacyRoundAccounts.value]) {
     try {
-      const r = roundDec.decode(decodeBase64(acc.account.data[0]));
+      const r = decodeRoundTolerant(decodeBase64(acc.account.data[0]));
       if (Number(r.endsAt) <= now && r.entryCount > 0) ended.push(r);
     } catch {
       /* not a Round — on-chain bytes are untrusted input */
