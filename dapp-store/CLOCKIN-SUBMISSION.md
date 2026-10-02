@@ -15,14 +15,19 @@ On a phone the mismatch is sharper. You are three taps from a camera and eleven
 from an account, so the thing people would actually pay for — point at this,
 make it something else — dies in the signup.
 
-**Who this is for.** Two users with the same unmet need:
+**Who this is for.**
 
-- **People who want one result, not a plan.** Students, sellers listing a
-  product, anyone for whom a $20/month floor is more than the job is worth.
-  Indonesia is the first market: card penetration is low, subscriptions are a
-  hard sell, and a wallet is not.
-- **Autonomous agents.** An agent with a wallet can buy a single inference
-  without a human creating an account for it. That market has no incumbent.
+- **First market: agents already paying over x402.** There is a live ecosystem
+  of software buyers transacting with HTTP 402 today, and it has no serious
+  inference seller — the catalogues an agent can discover are mostly single
+  tools, not 116 frontier models across image, video, voice, music and chat.
+  We are already in it rather than planning to be: 38 of our endpoints are
+  indexed in the GoPlausible facilitator's discovery catalogue, reachable by
+  any agent that can pay, with no account to create and no key to issue.
+- **Then: people who want one result, not a plan.** Students, sellers listing a
+  product, anyone for whom a $20/month floor is more than the job is worth. The
+  phone is how that user arrives, and the wallet is what lets them pay for one
+  thing.
 
 **Why this beats the existing apps.** Not model quality — we resell the same
 frontier models. The difference is the *unit*: one call, priced before it runs,
