@@ -260,6 +260,53 @@ describe('payout', () => {
     await expect(claim(round, entryA, a.ata, 1)).rejects.toThrow(/AlreadyPaid/);
   });
 
+  // The defect this guards: payouts used to divide the LIVE vault balance, so
+  // every claim shrank the base for the next one and whoever submitted first
+  // decided what everyone got. A runner-up claiming before first place got
+  // 6.25% of the full pot; claiming after, 6.25% of what was left — 2.5%.
+  it('pays a runner-up the same share whoever claims first', async () => {
+    // Four entrants so there is a real pot and a real second place.
+    const run = async (runnerFirst: boolean) => {
+      const endsAt = now() + HOUR;
+      const round = await createRound(endsAt);
+      const a = newEntrant(20_000_000n);
+      const b = newEntrant(20_000_000n);
+      const v1 = newEntrant(20_000_000n);
+      const v2 = newEntrant(20_000_000n);
+      for (const e of [a, b, v1, v2]) await enter(round, e.kp, e.ata);
+      const entryA = entryPda(round, a.kp.publicKey);
+      const entryB = entryPda(round, b.kp.publicKey);
+      // Two votes for A, one for B: A is place 1, B is place 2.
+      await vote(round, v1.kp, entryA);
+      await vote(round, v2.kp, entryA);
+      await vote(round, a.kp, entryB);
+
+      skipTo(endsAt + 1);
+      svm.expireBlockhash();
+      const pot = balance(vaultPda(round));
+      const beforeB = balance(b.ata);
+      if (runnerFirst) {
+        await claim(round, entryB, b.ata, 2);
+        svm.expireBlockhash();
+        await claim(round, entryA, a.ata, 1);
+      } else {
+        await claim(round, entryA, a.ata, 1);
+        svm.expireBlockhash();
+        await claim(round, entryB, b.ata, 2);
+      }
+      return { runnerGot: balance(b.ata) - beforeB, pot };
+    };
+
+    const runnerFirst = await run(true);
+    const winnerFirst = await run(false);
+
+    // Same pot either way, and the runner-up is paid the same both times.
+    expect(runnerFirst.pot).toBe(winnerFirst.pot);
+    expect(runnerFirst.runnerGot).toBe(winnerFirst.runnerGot);
+    // And it is the share the rules promise: 25% split across four places.
+    expect(runnerFirst.runnerGot).toBe((runnerFirst.pot * 2500n) / 10_000n / 4n);
+  });
+
   it('refuses to pay a winner into someone else\'s token account', async () => {
     const endsAt = now() + HOUR;
     const round = await createRound(endsAt);

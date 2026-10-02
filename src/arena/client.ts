@@ -374,8 +374,11 @@ const decodeBase64 = (b64: string) => new Uint8Array(Buffer.from(b64, 'base64'))
 /** Short form for display: `7xKX…mBvf`. */
 // Round is fixed-size, so `dataSize` alone identifies it. Mirrors Round::SPACE
 // in the program: 8 discriminator + 8 id + 32*3 keys + 4 + 80 theme + 8 fee
-// + 8 ends_at + 4 count + 1 settled + 1 bump + 32*5 top + 4*5 top_votes.
-const ROUND_SPACE = 398;
+// + 8 ends_at + 4 count + 1 settled + 1 bump + 32*5 top + 4*5 top_votes
+// + 8 pot. Rounds created before the pot snapshot shipped are 398 bytes and
+// will not match this filter — they are invisible to the board by design,
+// because the new Round layout cannot decode them either.
+const ROUND_SPACE = 406;
 // Entry::SPACE: 8 discriminator + 32 round + 32 entrant + 4 + 200 uri + 4 votes
 // + 8 created_at + 1 paid + 1 bump + 8 paid_fee.
 const ENTRY_SPACE = 298;

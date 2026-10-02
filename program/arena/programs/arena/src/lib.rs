@@ -104,6 +104,8 @@ pub mod arena {
         round.bump = ctx.bumps.round;
         round.top = [Pubkey::default(); TOP_N];
         round.top_votes = [0u32; TOP_N];
+        // Zero means "not snapshotted yet" — claim_place fills it on first claim.
+        round.pot = 0;
         Ok(())
     }
 
@@ -205,15 +207,35 @@ pub mod arena {
             ArenaError::NotThisPlace
         );
 
-        let pot = ctx.accounts.vault.amount;
+        // Snapshot the pot on the FIRST claim, then pay every place from that
+        // fixed number.
+        //
+        // Reading `vault.amount` per claim made the split order-dependent: each
+        // payout shrank the vault, so the base for the next claim shrank too. If
+        // first place claimed first they took 60% of the whole pot and each
+        // runner-up then drew 6.25% of what was LEFT — 2.5% of the real pot
+        // instead of 6.25%. Whoever submitted first decided what everyone got.
+        //
+        // Snapshotting lazily rather than at round end keeps this a pure
+        // addition: there is no settle instruction to call, and a round nobody
+        // claims costs nothing.
+        let round = &mut ctx.accounts.round;
+        if round.pot == 0 {
+            round.pot = ctx.accounts.vault.amount;
+        }
+        let pot = round.pot;
         let amount = match place {
             1 => pot * WINNER_BPS / 10_000,
             _ => pot * RUNNERS_BPS / 10_000 / RUNNER_PLACES as u64,
         };
         require!(amount > 0, ArenaError::NothingToPay);
+        // The last claimants must not be short-changed by rounding or by a pot
+        // that somehow holds less than the snapshot says.
+        require!(amount <= ctx.accounts.vault.amount, ArenaError::NothingToPay);
 
         let round_id = round.round_id.to_le_bytes();
-        let seeds: &[&[u8]] = &[b"round", round_id.as_ref(), &[round.bump]];
+        let bump = round.bump;
+        let seeds: &[&[u8]] = &[b"round", round_id.as_ref(), &[bump]];
         token::transfer(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -347,13 +369,17 @@ pub struct Round {
     /// anyone could claim place 1 for their own entry, no votes required.
     pub top: [Pubkey; TOP_N],
     pub top_votes: [u32; TOP_N],
+    /// The pot as it stood when the first place was claimed, in token base
+    /// units. Zero until then. Every payout divides this, never the live vault
+    /// balance, so the split does not depend on who claims first.
+    pub pot: u64,
 }
 
 impl Round {
     // 8 discriminator + 8 id + 32*3 keys + (4 + theme) + 8 fee + 8 ends_at
     // + 4 count + 1 settled + 1 bump + top (32*5) + top_votes (4*5)
     pub const SPACE: usize =
-        8 + 8 + 32 * 3 + 4 + MAX_THEME_LEN + 8 + 8 + 4 + 1 + 1 + 32 * TOP_N + 4 * TOP_N;
+        8 + 8 + 32 * 3 + 4 + MAX_THEME_LEN + 8 + 8 + 4 + 1 + 1 + 32 * TOP_N + 4 * TOP_N + 8;
 }
 
 /// Insert an entry into the leaderboard after its vote count changed.

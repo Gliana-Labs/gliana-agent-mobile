@@ -85,6 +85,12 @@ export type Round = {
    */
   top: Array<Address>;
   topVotes: Array<number>;
+  /**
+   * The pot as it stood when the first place was claimed, in token base
+   * units. Zero until then. Every payout divides this, never the live vault
+   * balance, so the split does not depend on who claims first.
+   */
+  pot: bigint;
 };
 
 export type RoundArgs = {
@@ -112,6 +118,12 @@ export type RoundArgs = {
    */
   top: Array<Address>;
   topVotes: Array<number>;
+  /**
+   * The pot as it stood when the first place was claimed, in token base
+   * units. Zero until then. Every payout divides this, never the live vault
+   * balance, so the split does not depend on who claims first.
+   */
+  pot: number | bigint;
 };
 
 /** Gets the encoder for {@link RoundArgs} account data. */
@@ -131,6 +143,7 @@ export function getRoundEncoder(): Encoder<RoundArgs> {
       ["bump", getU8Encoder()],
       ["top", getArrayEncoder(getAddressEncoder(), { size: 5 })],
       ["topVotes", getArrayEncoder(getU32Encoder(), { size: 5 })],
+      ["pot", getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: ROUND_DISCRIMINATOR }),
   );
@@ -152,6 +165,7 @@ export function getRoundDecoder(): Decoder<Round> {
     ["bump", getU8Decoder()],
     ["top", getArrayDecoder(getAddressDecoder(), { size: 5 })],
     ["topVotes", getArrayDecoder(getU32Decoder(), { size: 5 })],
+    ["pot", getU64Decoder()],
   ]);
 }
 
