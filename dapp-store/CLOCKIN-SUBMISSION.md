@@ -148,10 +148,17 @@ under a deadline.
 
 ## DECK URL
 ```
-https://ai.glianalabs.com/clockin
+(Google Drive link to gliana-agent-clockin.pdf — see below)
 ```
-PDF, for reviewers whose tools cannot render an HTML deck:
-`https://ai.glianalabs.com/clockin/gliana-agent-clockin.pdf`
+MUST be a Google Slides/Docs link or a PDF on Google Drive. The coach reported
+NOT READ against `https://ai.glianalabs.com/clockin`: a self-hosted HTML deck is
+not a format it accepts, so it had nothing to evaluate.
+
+Upload `~/Desktop/gliana-agent-clockin.pdf` to Drive, then Share →
+**Anyone with the link → Viewer**, and leave downloading ENABLED (they require
+it). 13 pages, 4.8 MB — inside the 40-page and 20 MB limits.
+
+The HTML original stays at `https://ai.glianalabs.com/clockin` for humans.
 
 Technical evidence (boundaries, build steps, on-chain transaction for every
 claim, measured latencies):
@@ -159,8 +166,13 @@ claim, measured latencies):
 
 ## DEMO VIDEO URL
 ```
-(upload ~/Desktop/gliana-clockin-demo.mp4 to YouTube, unlisted is fine, then paste the link)
+(public YouTube link — see below)
 ```
+NOT unlisted. The coach reported NOT READ and asks for a link that "plays
+without sign-in", so set visibility to **Public**. Upload
+`~/Desktop/gliana-clockin-demo.mp4` (1:57, 117.3s) and attach `demo.srt` as a
+caption track — the complaint was that the transcript could not be read, and
+real captions remove any dependence on their speech-to-text.
 
 ## REPOSITORY URL
 ```
