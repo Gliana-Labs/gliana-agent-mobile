@@ -14,7 +14,7 @@ Paste-ready values for the publisher portal. Assets referenced are in `./media/`
 | Editor's Choice graphic 1200×1200 | `media/graphic-1200x1200.png` |
 | Languages | English |
 | Countries | All countries |
-| App Website | `https://agent.glianalabs.com` |
+| App Website | `https://ai.glianalabs.com` |
 | Contact Email | `contact@glianalabs.com` |
 | Support Email | `contact@glianalabs.com` |
 | Terms of Use | `https://glianalabs.com/terms` |
