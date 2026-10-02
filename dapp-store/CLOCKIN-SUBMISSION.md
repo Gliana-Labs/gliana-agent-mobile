@@ -169,5 +169,5 @@ https://github.com/Gliana-Labs/gliana-agent-mobile
 
 ## ANDROID APK URL
 ```
-https://github.com/Gliana-Labs/gliana-agent-mobile/releases/download/v1.1.1/app-release.apk
+https://github.com/Gliana-Labs/gliana-agent-mobile/releases/download/v1.1.2/app-release.apk
 ```
