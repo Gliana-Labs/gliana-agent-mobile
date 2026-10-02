@@ -19,11 +19,12 @@ make it something else — dies in the signup.
 
 - **First market: agents already paying over x402.** There is a live ecosystem
   of software buyers transacting with HTTP 402 today, and it has no serious
-  inference seller — the catalogues an agent can discover are mostly single
-  tools, not 116 frontier models across image, video, voice, music and chat.
-  We are already in it rather than planning to be: 38 of our endpoints are
-  indexed in the GoPlausible facilitator's discovery catalogue, reachable by
-  any agent that can pay, with no account to create and no key to issue.
+  inference seller — what an agent can discover is mostly single tools, not 116
+  frontier models across image, video, voice, music and chat. We are already in
+  it rather than planning to be: **166 paid endpoints settling USDC on Solana**,
+  every one of them described in a public OpenAPI document with its price, chain
+  and payTo, reachable by any agent that can pay — no account to create, no key
+  to issue.
 - **Then: people who want one result, not a plan.** Students, sellers listing a
   product, anyone for whom a $20/month floor is more than the job is worth. The
   phone is how that user arrives, and the wallet is what lets them pay for one
