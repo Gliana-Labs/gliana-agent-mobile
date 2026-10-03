@@ -86,9 +86,10 @@ async function main() {
   if (!mine) throw new Error('entered, but the entry did not come back from getProgramAccounts');
   console.log(`entry ${mine.address}  paid ${skr(mine.data.paidFee)} SKR  votes ${mine.data.votes}`);
 
-  // Vote from a throwaway wallet: the program refuses a self-vote, and that is
-  // the rule most likely to be broken by a client that assumes otherwise.
-  const voterBytes = crypto.getRandomValues(new Uint8Array(64));
+  // Vote from a SECOND wallet: the program refuses a self-vote, and that is the
+  // rule most likely to be broken by a client that assumes otherwise. The voter
+  // is supplied, not generated — an ephemeral keypair has no devnet SOL to pay
+  // the Vote PDA's rent with, so it could never have voted anyway.
   const voterPath = process.env.VOTER_KEYPAIR;
   if (voterPath) {
     const voter = await localSigner(voterPath);
@@ -99,7 +100,6 @@ async function main() {
     console.log(`votes now ${after?.data.votes}`);
   } else {
     console.log('set VOTER_KEYPAIR=<path> to exercise voting too (needs its own devnet SOL)');
-    void voterBytes;
   }
 
   console.log('\nOK — the app\'s own client encodes, signs and lands on devnet.');
