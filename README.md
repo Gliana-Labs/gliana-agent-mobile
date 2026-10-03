@@ -86,6 +86,88 @@ npx expo start --dev-client
 Make sure a Solana wallet app (Phantom / Solflare / Backpack) is installed on the
 same device/emulator before connecting a wallet.
 
+## Verify it yourself
+
+Three things can be checked without a phone, a wallet or our servers.
+
+### 1. The Anchor program, against its own tests
+
+LiteSVM runs the compiled program in-process — no validator, no airdrop, about a
+second.
+
+```bash
+cd program/arena
+npm install
+cargo build-sbf          # produces target/deploy/arena.so, which the tests load
+npm test
+```
+
+All 17 pass, and they are named after the rules they defend rather than the
+functions they call:
+
+```
+the round
+  ✓ takes the fee into a vault only the program can move
+  ✓ refuses an entry once the round has ended
+  ✓ refuses a second entry from the same wallet
+  ✓ refuses an entrant who cannot pay the fee
+voting
+  ✓ counts one vote per wallet and refuses a second
+  ✓ refuses a vote for your own entry
+  ✓ records how early the vote was
+payout
+  ✓ pays the winner 60% of the pot, once, and only after the round ends
+  ✓ pays a runner-up the same share whoever claims first
+  ✓ refuses to pay a winner into someone else's token account
+  ✓ refuses a place outside 1..5
+  ✓ refuses an entry from a different round
+the leaderboard decides who gets paid
+  ✓ refuses a claim from an entry that won nothing
+  ✓ orders the top five by votes, and a tie keeps the earlier entry ahead
+SKR holders pay less
+  ✓ charges 80% of the fee to a wallet holding 100 SKR or more
+  ✓ charges face value just below the threshold
+  ✓ cannot be claimed by a wallet that does not hold the tokens
+
+Test Files  1 passed (1)
+     Tests  17 passed (17)
+```
+
+Two of those answer the question a scanner raises about `claim_place`, which
+deliberately takes no signer: *refuses to pay a winner into someone else's token
+account* and *refuses a claim from an entry that won nothing*. Anyone may push a
+payout; nobody may redirect one. See `SECURITY.md`.
+
+### 2. The app's own client, against mainnet
+
+`scripts/` drives the same client the app uses, from a terminal:
+
+```bash
+npm run arena:state      # today's round, pot, entries — read-only, no wallet
+npm run arena:board      # the all-time standings the Board tab shows
+npm run arena:smoke      # opens, enters and votes on devnet (needs a funded keypair)
+```
+
+`arena:state` and `arena:board` need nothing but a network connection, and are
+the quickest way to confirm the round in the app is the round on chain.
+
+### 3. The paid path, without installing anything
+
+Every price the app shows comes from the live gateway:
+
+```bash
+curl -s https://api.glianalabs.com/v1/models | head -c 400     # the catalog the app reads
+curl -s 'https://api.glianalabs.com/v1/price?model=krea-2-medium-turbo'
+curl -si -X POST https://api.glianalabs.com/v1/infer \
+  -H 'content-type: application/json' \
+  -d '{"model":"krea-2-medium-turbo","prompt":"a paper crane"}' | head -20
+```
+
+The last one returns **402 Payment Required** with a `WWW-Authenticate: Payment`
+challenge naming the amount and the rails. That challenge is the whole product:
+there is no account to make and no key to issue, and the app is simply a client
+that answers it from the user's wallet.
+
 ## Build (EAS)
 
 ```bash
