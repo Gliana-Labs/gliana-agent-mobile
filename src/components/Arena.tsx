@@ -38,9 +38,13 @@ import { useArena, HOLDER_THRESHOLD, type Placing } from '../arena/useArena';
 import { fetchStandings, shortAddress, type EntryWithAddress, type Standing } from '../arena/client';
 import { CLUSTER, skr, kindFor, acceptsContentType, type ThemeKind } from '../arena/config';
 import { EntryMedia } from './arena/EntryMedia';
+import { EntryViewer } from './arena/EntryViewer';
 
 /** Picker thumbnail edge, shared by the style and the media cell inside it. */
 const PICK_SIZE = 84;
+
+/** Cheap medium sniff for places too small to host a real player. */
+const isPlayable = (uri: string) => /\.(mp3|m4a|wav|ogg|mp4|mov|webm)$/i.test(uri);
 import { Chip, Pot, Press, Rank, ThemeCard, WinBanner, tapSelect, PIXEL, px } from './arena/bits';
 import { isMuted, play, setMuted } from '../lib/sfx';
 import type { GenerationResult } from '../types';
@@ -98,7 +102,7 @@ export function Arena({
               {/* One line, always: a fourth tab left the count wrapping under
                   the word, which read as a broken label rather than a badge. */}
               <Text numberOfLines={1} style={[styles.tabText, tab === t && styles.tabTextOn]}>
-                {t === 'today' ? 'Today' : t === 'gallery' ? 'Gallery' : t === 'board' ? 'Board' : 'You'}
+                {t === 'today' ? 'Today' : t === 'gallery' ? 'Vote' : t === 'board' ? 'Board' : 'You'}
                 {t === 'gallery' && arena.entries.length > 0 ? ` ${arena.entries.length}` : ''}
               </Text>
             </Pressable>
@@ -158,6 +162,9 @@ function Today({
   onMake: (prompt: string) => void;
 }) {
   const left = useCountdown(arena.endsAt);
+  // The "You're in" cell is full card width: a player needs a real size, not a
+  // percentage, because the video and audio views measure in pixels.
+  const myWidth = useWindowDimensions().width - space(6) - space(6);
   // The ROUND decides the medium. One medium per round, because a gallery that
   // mixes a silent thumbnail with a track asks the voter to compare two
   // different things, and votes are already the scarce resource here.
@@ -213,7 +220,11 @@ function Today({
             <Text style={styles.title}>You're in</Text>
             <Chip text={`${arena.mine.data.votes} ${arena.mine.data.votes === 1 ? 'vote' : 'votes'}`} />
           </View>
-          <Image source={{ uri: arena.mine.data.mediaUri }} style={styles.myImage} contentFit="cover" transition={160} />
+          {/* Your entry, in whatever medium the round is. An <Image> here showed
+              "image unavailable" over a perfectly good track. */}
+          <View style={styles.myImage}>
+            <EntryMedia kind={kind} uri={arena.mine.data.mediaUri} size={myWidth} active={false} />
+          </View>
           <Text style={styles.body}>Paid {skr(arena.mine.data.paidFee)} SKR to enter.</Text>
         </Card>
       ) : enterable.length === 0 ? (
@@ -333,7 +344,15 @@ function Result({ arena }: { arena: ReturnType<typeof useArena> }) {
   return (
     <View style={styles.yesterday}>
       {y.mediaUri ? (
-        <Image source={{ uri: y.mediaUri }} style={styles.thumb} contentFit="cover" transition={160} />
+        // 44px is too small for a player or a waveform, so a non-image winner
+        // gets a glyph. A broken thumbnail is worse than no thumbnail.
+        isPlayable(y.mediaUri) ? (
+          <View style={[styles.thumb, styles.thumbGlyph]}>
+            <Text style={styles.thumbGlyphText}>{y.mediaUri.endsWith('.mp3') ? '♪' : '▶'}</Text>
+          </View>
+        ) : (
+          <Image source={{ uri: y.mediaUri }} style={styles.thumb} contentFit="cover" transition={160} />
+        )
       ) : null}
       <Text style={[styles.meta, { flex: 1 }]} numberOfLines={2}>
         Yesterday · "{y.theme}" · won by {shortAddress(y.winner)} with {y.winnerVotes}{' '}
@@ -365,6 +384,9 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
   const kind = arena.roundId !== null ? kindFor(arena.roundId) : 'image';
   // Which cell is on screen, so one video plays rather than all of them.
   const [visible, setVisible] = useState<string | null>(null);
+  // Which entry is open full screen. You cannot judge a clip in a 180px tile,
+  // and a vote you cannot inform is a vote nobody casts.
+  const [open, setOpen] = useState<EntryWithAddress | null>(null);
   const onViewable = useRef(({ viewableItems }: { viewableItems: { key: string }[] }) => {
     setVisible(viewableItems[0]?.key ?? null);
   }).current;
@@ -393,6 +415,25 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => void arena.refresh()} tintColor={colors.flame} />}
       onViewableItemsChanged={onViewable}
       viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+      ListFooterComponent={
+        open ? (
+          <EntryViewer
+            visible
+            kind={kind}
+            uri={open.data.mediaUri}
+            entrant={open.data.entrant}
+            votes={open.data.votes}
+            canVote={!arena.voted && open.data.entrant !== me}
+            busy={arena.busy}
+            onVote={() => {
+              const e = open;
+              setOpen(null);
+              void arena.vote(e.address).then(() => play('vote'), () => play('nope'));
+            }}
+            onClose={() => setOpen(null)}
+          />
+        ) : null
+      }
       renderItem={({ item, index }) => (
         <EntryCard
           entry={item}
@@ -403,6 +444,7 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
           mine={item.data.entrant === me}
           kind={kind}
           active={visible === item.address}
+          onOpen={() => setOpen(item)}
           canVote={!arena.voted && item.data.entrant !== me}
           busy={arena.busy}
           onVote={() => void arena.vote(item.address).then(() => play('vote'), () => play('nope'))}
@@ -422,6 +464,7 @@ function EntryCard({
   onVote,
   kind,
   active,
+  onOpen,
 }: {
   entry: EntryWithAddress;
   width: number;
@@ -433,10 +476,19 @@ function EntryCard({
   kind: ThemeKind;
   /** Only the cell on screen plays: four decoders at once cooks the phone. */
   active: boolean;
+  onOpen: () => void;
 }) {
   return (
     <View style={[styles.entry, { width }, mine && styles.entryMine]}>
-      <EntryMedia kind={kind} uri={entry.data.mediaUri} size={width} active={active} />
+      {/* The media keeps its own tap — play, or unmute — so opening needs its
+          own control. Wrapping the tile in a Pressable just lost the race to
+          the inner one and the viewer never opened. */}
+      <View>
+        <EntryMedia kind={kind} uri={entry.data.mediaUri} size={width} active={active} />
+        <Press onPress={onOpen} haptic="none" style={styles.expand}>
+          <Text style={styles.expandGlyph}>⤢</Text>
+        </Press>
+      </View>
       {/* Stacked, not side by side: at half the screen width, pixel type and a
           44px button cannot share a row, and the button ended up sitting on top
           of the vote count. */}
@@ -833,7 +885,15 @@ const styles = StyleSheet.create({
     gap: space(2),
   },
   // Nested media: parent radius (16) − padding (16), floored at 8.
-  myImage: { width: '100%', aspectRatio: 1, borderRadius: 2, marginTop: space(1) },
+  myImage: { width: '100%', aspectRatio: 1, borderRadius: 2, marginTop: space(1), overflow: 'hidden' },
+  expand: {
+    position: 'absolute', top: space(2), right: space(2),
+    width: 30, height: 30, borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center',
+  },
+  expandGlyph: { color: colors.text, fontSize: 15, lineHeight: 17 },
+  thumbGlyph: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceStrong },
+  thumbGlyphText: { color: colors.textDim, fontSize: 16 },
 
   pick: { width: PICK_SIZE, height: PICK_SIZE, borderRadius: 2, borderWidth: px.border, borderColor: colors.border },
   pickOn: { borderColor: colors.flame },

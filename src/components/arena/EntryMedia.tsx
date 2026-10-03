@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { colors, font, space } from '../../theme';
 import type { ThemeKind } from '../../arena/config';
 
@@ -106,13 +106,49 @@ function VideoCell({ uri, size, active }: { uri: string; size: number; active: b
 function MusicCell({ uri, size }: { uri: string; size: number }) {
   const player = useAudioPlayer({ uri });
   const status = useAudioPlayerStatus(player);
-  // Driven locally, CORRECTED by status. Reading `status.playing` alone left the
-  // label on "tap to hear" through a preview that was actually playing: the
-  // status round-trip lags the tap by longer than a person waits before
-  // concluding the button is dead.
+  // Intent, not state. play() on a player that has not finished loading is a
+  // silent no-op in expo-audio — it returns, the status stays paused at
+  // position 0, and nothing ever comes out of the speaker. So the tap records
+  // that the listener WANTS it, and an effect starts playback once the player
+  // says it is loaded.
   const [want, setWant] = useState(false);
-  const playing = want || (status?.playing ?? false);
+  const loaded = status?.isLoaded ?? false;
+  const playing = status?.playing ?? false;
   const stop = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!want || !loaded || playing) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await player.seekTo(0);
+      } catch {
+        /* a player that cannot seek can still play from where it is */
+      }
+      if (cancelled) return;
+      // initSfx sets a GLOBAL audio mode for the arcade blips: playsInSilentMode
+      // false, so a UI chirp never rings out of a silenced phone. An entry is
+      // not a chirp — someone asked to hear it — and that global policy was
+      // swallowing play() entirely: loaded, ready, no error, position stuck at
+      // zero. Opt this playback out of it.
+      try {
+        await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers' });
+      } catch {
+        /* audio mode is a preference, not a precondition — try to play anyway */
+      }
+      if (cancelled) return;
+      player.play();
+      // Preview, not playback: the voter hears a hook from every entry rather
+      // than one track in full.
+      stop.current = setTimeout(() => {
+        player.pause();
+        setWant(false);
+      }, PREVIEW_SECONDS * 1000);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [want, loaded, playing, player]);
 
   useEffect(() => {
     return () => {
@@ -120,29 +156,14 @@ function MusicCell({ uri, size }: { uri: string; size: number }) {
     };
   }, []);
 
-  const toggle = async () => {
+  const toggle = () => {
     if (stop.current) clearTimeout(stop.current);
-    if (playing) {
+    if (want || playing) {
       setWant(false);
       player.pause();
       return;
     }
     setWant(true);
-    // AWAIT the seek. Firing seekTo and play together left the player loaded,
-    // buffered and paused at position 0 — the seek landed after the play and
-    // cancelled it.
-    try {
-      await player.seekTo(0);
-    } catch {
-      /* a player that cannot seek can still play from wherever it is */
-    }
-    player.play();
-    // Preview, not playback: the voter hears a hook from every entry rather
-    // than one track in full.
-    stop.current = setTimeout(() => {
-      player.pause();
-      setWant(false);
-    }, PREVIEW_SECONDS * 1000);
   };
 
   const bars = BAR_HEIGHTS.slice(0, Math.max(10, Math.floor(size / 14)));
@@ -160,7 +181,7 @@ function MusicCell({ uri, size }: { uri: string; size: number }) {
           />
         ))}
       </View>
-      <Text style={s.musicLabel}>{playing ? `${PREVIEW_SECONDS}s PREVIEW` : 'TAP TO HEAR'}</Text>
+      <Text style={s.musicLabel}>{playing ? `${PREVIEW_SECONDS}s PREVIEW` : want ? 'LOADING…' : 'TAP TO HEAR'}</Text>
     </Pressable>
   );
 }
