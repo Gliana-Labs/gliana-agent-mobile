@@ -106,7 +106,12 @@ function VideoCell({ uri, size, active }: { uri: string; size: number; active: b
 function MusicCell({ uri, size }: { uri: string; size: number }) {
   const player = useAudioPlayer({ uri });
   const status = useAudioPlayerStatus(player);
-  const playing = status?.playing ?? false;
+  // Driven locally, CORRECTED by status. Reading `status.playing` alone left the
+  // label on "tap to hear" through a preview that was actually playing: the
+  // status round-trip lags the tap by longer than a person waits before
+  // concluding the button is dead.
+  const [want, setWant] = useState(false);
+  const playing = want || (status?.playing ?? false);
   const stop = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -115,23 +120,35 @@ function MusicCell({ uri, size }: { uri: string; size: number }) {
     };
   }, []);
 
-  const toggle = () => {
+  const toggle = async () => {
+    if (stop.current) clearTimeout(stop.current);
     if (playing) {
+      setWant(false);
       player.pause();
-      if (stop.current) clearTimeout(stop.current);
       return;
     }
-    void player.seekTo(0);
+    setWant(true);
+    // AWAIT the seek. Firing seekTo and play together left the player loaded,
+    // buffered and paused at position 0 — the seek landed after the play and
+    // cancelled it.
+    try {
+      await player.seekTo(0);
+    } catch {
+      /* a player that cannot seek can still play from wherever it is */
+    }
     player.play();
     // Preview, not playback: the voter hears a hook from every entry rather
     // than one track in full.
-    stop.current = setTimeout(() => player.pause(), PREVIEW_SECONDS * 1000);
+    stop.current = setTimeout(() => {
+      player.pause();
+      setWant(false);
+    }, PREVIEW_SECONDS * 1000);
   };
 
   const bars = BAR_HEIGHTS.slice(0, Math.max(10, Math.floor(size / 14)));
 
   return (
-    <Pressable onPress={toggle} style={[s.music, { width: size, height: size }]}>
+    <Pressable onPress={() => void toggle()} style={[s.music, { width: size, height: size }]}>
       <View style={s.bars}>
         {bars.map((h, i) => (
           <View
