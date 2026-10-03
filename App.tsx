@@ -30,6 +30,13 @@ import { MenuIcon } from './src/components/icons';
 import { Backdrop } from './src/components/Backdrop';
 import type { Conversation, GenerationResult, Message, ProposalDraft } from './src/types';
 import { initSfx } from './src/lib/sfx';
+import {
+  initMusic,
+  setMusicActive,
+  isMusicMuted,
+  setMusicMuted,
+  onMusicMuteChange,
+} from './src/lib/music';
 import { rescheduleQuestReminders } from './src/lib/quest-reminder';
 import { SnapSheet } from './src/components/SnapSheet';
 import { Viewfinder } from './src/components/Viewfinder';
@@ -123,6 +130,13 @@ function Main() {
    * offers you to enter. Kept here because conversations live here; the Arena
    * never generates anything itself.
    */
+  // The loop belongs to the map. It stops in the chat, where a generated clip
+  // or track may play, and while the Arena is open, where entries are being
+  // judged — background music over someone's music entry is not a fair hearing.
+  useEffect(() => {
+    setMusicActive(view === 'home' && !arenaOpen);
+  }, [view, arenaOpen]);
+
   const finishedResults = useMemo(
     () =>
       conversations
@@ -142,6 +156,7 @@ function Main() {
   // and the sound lands after the thing it punctuates.
   useEffect(() => {
     void initSfx();
+  void initMusic();
     // Keep the week's reminders pointing at the right themes. No-op until the
     // player has granted notifications, which we only ask for after an entry.
     void rescheduleQuestReminders();
@@ -532,6 +547,7 @@ function Home({
           <Pressable onPress={onMenu} style={styles.hudBtn} hitSlop={8}>
             <Text style={styles.hudGlyph}>☰</Text>
           </Pressable>
+          <MusicToggle />
           <View style={styles.hudClock}>
             <Text style={styles.hudClockText}>◈ {left ?? '—'}</Text>
           </View>
@@ -702,6 +718,36 @@ const rid = () =>
   // crypto.randomUUID exists under react-native-get-random-values' env; fall back just in case.
   (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
+/**
+ * Mute the map loop, on the map, where you hear it.
+ *
+ * The sfx toggle lives three taps deep in the Arena's You tab, which is fine
+ * for a blip you have already heard and no good at all for a soundtrack that
+ * starts the moment the app opens.
+ */
+function MusicToggle() {
+  const [muted, setLocal] = useState(isMusicMuted());
+  // The stored preference arrives after this mounts, so follow it rather than
+  // sampling it once.
+  useEffect(() => onMusicMuteChange(setLocal), []);
+  return (
+    <Pressable
+      onPress={() => {
+        const next = !muted;
+        setLocal(next);
+        void setMusicMuted(next);
+      }}
+      style={styles.hudBtn}
+      hitSlop={8}
+      accessibilityLabel={muted ? 'Turn music on' : 'Turn music off'}
+    >
+      {/* Colour, not a combining slash: U+0338 renders as a stray box on some
+          Android fonts, so "muted" looked like a glyph error. */}
+      <Text style={[styles.hudGlyph, muted && styles.hudGlyphOff]}>♪</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.ink },
   header: {
@@ -776,6 +822,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  hudGlyphOff: { color: colors.textGhost, opacity: 0.5 },
   hudGlyph: { color: colors.textDim, fontSize: 16 },
   hudClock: {
     paddingHorizontal: space(3),

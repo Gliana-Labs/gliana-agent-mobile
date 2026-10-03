@@ -146,6 +146,47 @@ rejected by the program.
 so every client resolves the same round, theme, pot and gallery. Entry is
 permissionless: anything that can call the program can enter.
 
+### A round has a medium and a source
+
+`src/arena/themes.json` gives every theme two properties, and the client reads
+them from the round id alone — so every device shows the same contest without
+asking a server.
+
+| | Values | What changes |
+|---|---|---|
+| `kind` | `image` · `video` · `music` | the quest copy, what the picker offers, how an entry renders |
+| `source` | `camera` · `prompt` | whether the round wants a photograph or a description |
+
+Six camera rounds and six prompt rounds among the image themes, plus two video
+and two music themes (both necessarily `prompt` — a camera does not produce a
+clip or a track).
+
+A **camera round** offers the camera and nothing else, and the picker only
+accepts generations that started from a photo taken in the app
+(`GenerationResult.fromCamera`, set on the conversation the camera flow
+creates). A **prompt round** has no camera button and is won on the description.
+
+This is enforced **in the app, not on chain**. `enter` takes any URI from
+anyone, so a script can post whatever it likes into any round; what the client
+guarantees is that it never invites it, and that the gallery renders each entry
+by its actual file type rather than by the round's.
+
+### Judging an entry
+
+The gallery is a grid of **posters** — a still frame, a waveform, a picture —
+and nothing autoplays. Tapping one opens it full screen with real playback
+(native transport for video, a seek bar for audio), which is where the vote is
+cast: a clip in a 180px tile and a track cut to an eight-second preview tell a
+voter what is there, not whether it is any good. An entrant can share their own
+entry from that screen, and only their own.
+
+Serving this needed a gateway fix: `/v1/media` answered HTTP Range requests
+with `200` and the whole body and never sent `Accept-Ranges`. ExoPlayer
+range-requests an mp3 to establish its duration, so a 20-second track reported
+itself as five seconds and never finished loading — audio entries were silent
+while video happened to tolerate it. The endpoint now serves `206` with
+`Content-Range`, `416` past the end, and `Accept-Ranges` on every response.
+
 ## The AI side
 
 | Step | What runs | Notes |
