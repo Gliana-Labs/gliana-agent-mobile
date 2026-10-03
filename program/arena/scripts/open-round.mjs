@@ -25,7 +25,10 @@ const FEE = BigInt(process.env.ENTRY_FEE ?? 5_000_000); // 5 SKR
  */
 const THEMES = JSON.parse(readFileSync(new URL('../../../src/arena/themes.json', import.meta.url), 'utf8'));
 const todayId = Math.floor((Date.now() + 12 * 3_600_000) / 86_400_000);
-const THEME = process.env.THEME ?? THEMES[todayId % THEMES.length];
+// themes.json entries carry a `kind` now; the account still stores only the
+// text, because the medium is a client concern and the program never reads it.
+const TODAY = THEMES[todayId % THEMES.length];
+const THEME = process.env.THEME ?? (typeof TODAY === 'string' ? TODAY : TODAY.text);
 
 const idl = JSON.parse(readFileSync(new URL('../target/idl/arena.json', import.meta.url), 'utf8'));
 const secret = JSON.parse(readFileSync(process.env.KEYPAIR ?? `${process.env.HOME}/.config/solana/id.json`, 'utf8'));

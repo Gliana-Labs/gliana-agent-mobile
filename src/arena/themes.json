@@ -1,16 +1,66 @@
 [
-  "the oldest thing within reach",
-  "your desk in 2090",
-  "this room, but everything is alive",
-  "what you touched most today",
-  "something that outlived its owner",
-  "your machine, transformed into a robot",
-  "the view from your window, 100 years on",
-  "a shrine to a tangled cable",
-  "the chair nobody sits in",
-  "your floor, as a map of somewhere",
-  "the last warm drink on earth",
-  "the smallest thing here, enormous",
-  "your least photogenic corner, made holy",
-  "what the light is doing right now"
+  {
+    "text": "the oldest thing within reach",
+    "kind": "image"
+  },
+  {
+    "text": "your desk in 2090",
+    "kind": "image"
+  },
+  {
+    "text": "this room, but everything is alive",
+    "kind": "video"
+  },
+  {
+    "text": "what you touched most today",
+    "kind": "image"
+  },
+  {
+    "text": "something that outlived its owner",
+    "kind": "image"
+  },
+  {
+    "text": "your machine, transformed into a robot",
+    "kind": "image"
+  },
+  {
+    "text": "the view from your window, 100 years on",
+    "kind": "image"
+  },
+  {
+    "text": "a shrine to a tangled cable",
+    "kind": "image"
+  },
+  {
+    "text": "the chair nobody sits in",
+    "kind": "image"
+  },
+  {
+    "text": "your floor, as a map of somewhere",
+    "kind": "image"
+  },
+  {
+    "text": "the last warm drink on earth",
+    "kind": "image"
+  },
+  {
+    "text": "the smallest thing here, enormous",
+    "kind": "image"
+  },
+  {
+    "text": "your least photogenic corner, made holy",
+    "kind": "image"
+  },
+  {
+    "text": "what the light is doing right now",
+    "kind": "video"
+  },
+  {
+    "text": "the sound of your street, as a song",
+    "kind": "music"
+  },
+  {
+    "text": "what this room would sound like, awake",
+    "kind": "music"
+  }
 ]

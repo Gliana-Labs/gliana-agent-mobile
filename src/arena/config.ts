@@ -95,9 +95,48 @@ export const roundIdFor = (when: Date = new Date()): bigint =>
  * copy too many: a drifted entry means the app shows a theme nobody was
  * generating for.
  */
-export const THEMES: string[] = THEME_LIST;
+/**
+ * What medium a round is contested in.
+ *
+ * ONE medium per round, not per entry. A grid of images is judged in a glance;
+ * four songs is two minutes of listening before anyone can vote, and votes are
+ * already the scarce resource here. Mixing them in one gallery would make a
+ * silent thumbnail compete with a track on unequal terms, so the round decides
+ * and every entry in it is the same kind.
+ *
+ * It lives in themes.json, NOT on chain: the opener writes only the theme
+ * string, and every client derives the rest from the same file. Putting it in
+ * the Round account would have meant a program change for a client concern.
+ */
+export type ThemeKind = 'image' | 'video' | 'music';
 
-export const themeFor = (roundId: bigint): string => THEMES[Number(roundId % BigInt(THEMES.length))];
+export interface Theme {
+  text: string;
+  kind: ThemeKind;
+}
+
+export const THEMES: Theme[] = THEME_LIST as Theme[];
+
+const themeAt = (roundId: bigint): Theme => THEMES[Number(roundId % BigInt(THEMES.length))];
+
+export const themeFor = (roundId: bigint): string => themeAt(roundId).text;
+
+/** The medium today's round is contested in. */
+export const kindFor = (roundId: bigint): ThemeKind => themeAt(roundId).kind;
+
+/**
+ * Which generated results may be staked in a round of this kind.
+ *
+ * Matched on the result's own contentType rather than the model that made it:
+ * a model can return something other than its headline modality, and the entry
+ * is judged on what it IS, not what produced it.
+ */
+export const acceptsContentType = (kind: ThemeKind, contentType: string | undefined): boolean => {
+  const t = contentType ?? '';
+  if (kind === 'video') return t.startsWith('video/');
+  if (kind === 'music') return t.startsWith('audio/');
+  return t.startsWith('image/');
+};
 
 /** What a round costs to enter, in SKR base units. Face value; holders pay 20% less. */
 export const ENTRY_FEE = toSkrBase(5);

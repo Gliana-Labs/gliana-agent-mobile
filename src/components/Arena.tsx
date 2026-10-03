@@ -36,7 +36,11 @@ import { useWallet } from '../lib/mwa';
 import { colors, font, radius, space } from '../theme';
 import { useArena, HOLDER_THRESHOLD, type Placing } from '../arena/useArena';
 import { fetchStandings, shortAddress, type EntryWithAddress, type Standing } from '../arena/client';
-import { CLUSTER, skr } from '../arena/config';
+import { CLUSTER, skr, kindFor, acceptsContentType, type ThemeKind } from '../arena/config';
+import { EntryMedia } from './arena/EntryMedia';
+
+/** Picker thumbnail edge, shared by the style and the media cell inside it. */
+const PICK_SIZE = 84;
 import { Chip, Pot, Press, Rank, ThemeCard, WinBanner, tapSelect, PIXEL, px } from './arena/bits';
 import { isMuted, play, setMuted } from '../lib/sfx';
 import type { GenerationResult } from '../types';
@@ -154,8 +158,10 @@ function Today({
   onMake: (prompt: string) => void;
 }) {
   const left = useCountdown(arena.endsAt);
-  // Only images can be entered: the gallery is judged in a second, and a video
-  // nobody plays is an entry nobody votes for.
+  // The ROUND decides the medium. One medium per round, because a gallery that
+  // mixes a silent thumbnail with a track asks the voter to compare two
+  // different things, and votes are already the scarce resource here.
+  const kind = arena.roundId !== null ? kindFor(arena.roundId) : 'image';
   /**
    * NEWEST FIRST. The image you are about to stake is almost always the one you
    * just made, and it was last in a horizontal scroller — so the obvious tap
@@ -167,7 +173,7 @@ function Today({
   const enterable = useMemo(
     () =>
       results
-        .filter((r) => Boolean(r.url) && (r.contentType ?? '').startsWith('image/'))
+        .filter((r) => Boolean(r.url) && acceptsContentType(kind, r.contentType))
         .slice()
         .reverse()
         .slice(0, 12),
@@ -214,25 +220,49 @@ function Today({
         // No disabled slab: the dead end becomes the loop. This seeds the chat
         // composer with today's theme — a text seed, not a charge.
         <Card>
-          {/* The quest is a PHOTO quest: you shoot the theme, then restyle the
-              shot. It is the one thing a laptop cannot enter, and it means
-              every entry starts from something real that the player saw —
-              which is a better contest than who typed the better prompt. */}
-          <Text style={styles.title}>Shoot today's theme</Text>
-          <Text style={styles.body}>
-            Photograph something for “{arena.theme}”, pick a look, and it becomes your entry.
-            You pay for the image as normal, then enter for {skr(arena.fee)} SKR.
+          {/* An IMAGE round is a photo quest: you shoot the theme, then restyle
+              the shot. It is the one thing a laptop cannot enter, and every
+              entry starts from something the player actually saw — a better
+              contest than who typed the better prompt. A video or music round
+              has no camera step, so it leads with the composer instead. */}
+          <Text style={styles.title}>
+            {kind === 'image' ? "Shoot today's theme" : kind === 'video' ? "Film today's theme" : "Score today's theme"}
           </Text>
-          <Action label="Open the camera" busy={false} onPress={onSnap} />
-          <Press onPress={() => onMake(`Make an image: ${arena.theme}, `)} haptic="none" style={styles.linkRow}>
-            <Text style={styles.link}>or describe it instead →</Text>
-          </Press>
+          <Text style={styles.body}>
+            {kind === 'image'
+              ? `Photograph something for “${arena.theme}”, pick a look, and it becomes your entry.`
+              : kind === 'video'
+                ? `Make a short clip for “${arena.theme}” — start from a photo or describe it.`
+                : `Make a track for “${arena.theme}”. It plays as an eight-second preview in the gallery.`}
+            {' '}You pay for it as normal, then enter for {skr(arena.fee)} SKR.
+          </Text>
+          {kind === 'image' ? (
+            <>
+              <Action label="Open the camera" busy={false} onPress={onSnap} />
+              <Press onPress={() => onMake(`Make an image: ${arena.theme}, `)} haptic="none" style={styles.linkRow}>
+                <Text style={styles.link}>or describe it instead →</Text>
+              </Press>
+            </>
+          ) : (
+            <>
+              <Action
+                label={kind === 'video' ? 'Describe the clip' : 'Describe the track'}
+                busy={false}
+                onPress={() => onMake(kind === 'video' ? `Make a 5 second video: ${arena.theme}, ` : `Make a track: ${arena.theme}, `)}
+              />
+              {kind === 'video' ? (
+                <Press onPress={onSnap} haptic="none" style={styles.linkRow}>
+                  <Text style={styles.link}>or shoot a photo to animate →</Text>
+                </Press>
+              ) : null}
+            </>
+          )}
         </Card>
       ) : (
         <Card>
           <Text style={styles.title}>Enter today's round</Text>
           <Text style={styles.body}>
-            Pick one of your images. Entry is {skr(arena.fee)} SKR
+            Pick one of your {kind === 'image' ? 'images' : kind === 'video' ? 'clips' : 'tracks'}. Entry is {skr(arena.fee)} SKR
             {arena.isHolder ? ' — holder price, 20% off.' : '.'}
           </Text>
           <FlatList
@@ -249,17 +279,17 @@ function Today({
                   setPicked(item.url!);
                 }}
               >
-                <Image
-                  source={{ uri: item.url! }}
-                  style={[styles.pick, picked === item.url! && styles.pickOn]}
-                  contentFit="cover"
-                  transition={160}
-                />
+                {/* A video or a track has no thumbnail, so the picker shows
+                    the same cell the gallery will — you choose the thing the
+                    voters will actually see or hear. */}
+                <View style={[styles.pick, picked === item.url! && styles.pickOn, { overflow: 'hidden' }]}>
+                  <EntryMedia kind={kind} uri={item.url!} size={PICK_SIZE} active={false} />
+                </View>
               </Press>
             )}
           />
           <Action
-            label={picked ? `Enter · ${skr(arena.fee)} SKR` : 'Pick an image'}
+            label={picked ? `Enter · ${skr(arena.fee)} SKR` : kind === 'image' ? 'Pick an image' : kind === 'video' ? 'Pick a clip' : 'Pick a track'}
             busy={arena.busy}
             disabled={!connected || !picked}
             onPress={() => picked && void arena.enter(picked).then(() => play('enter'), () => play('nope'))}
@@ -332,6 +362,12 @@ function Split() {
 
 function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string | null }) {
   const { width } = useWindowDimensions();
+  const kind = arena.roundId !== null ? kindFor(arena.roundId) : 'image';
+  // Which cell is on screen, so one video plays rather than all of them.
+  const [visible, setVisible] = useState<string | null>(null);
+  const onViewable = useRef(({ viewableItems }: { viewableItems: { key: string }[] }) => {
+    setVisible(viewableItems[0]?.key ?? null);
+  }).current;
 
   if (arena.loading) return <Loading />;
   if (arena.entries.length === 0)
@@ -355,6 +391,8 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
         </Text>
       }
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => void arena.refresh()} tintColor={colors.flame} />}
+      onViewableItemsChanged={onViewable}
+      viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
       renderItem={({ item, index }) => (
         <EntryCard
           entry={item}
@@ -363,6 +401,8 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
           // invented social proof.
           rank={arena.entries.length >= 3 && item.data.votes > 0 ? index + 1 : null}
           mine={item.data.entrant === me}
+          kind={kind}
+          active={visible === item.address}
           canVote={!arena.voted && item.data.entrant !== me}
           busy={arena.busy}
           onVote={() => void arena.vote(item.address).then(() => play('vote'), () => play('nope'))}
@@ -380,6 +420,8 @@ function EntryCard({
   canVote,
   busy,
   onVote,
+  kind,
+  active,
 }: {
   entry: EntryWithAddress;
   width: number;
@@ -388,25 +430,13 @@ function EntryCard({
   canVote: boolean;
   busy: boolean;
   onVote: () => void;
+  kind: ThemeKind;
+  /** Only the cell on screen plays: four decoders at once cooks the phone. */
+  active: boolean;
 }) {
-  // A blank tile is indistinguishable from a bug, so a failed image says so.
-  const [failed, setFailed] = useState(false);
-
   return (
     <View style={[styles.entry, { width }, mine && styles.entryMine]}>
-      {failed ? (
-        <View style={[styles.thumbFail, { width, height: width }]}>
-          <Text style={styles.meta}>image unavailable</Text>
-        </View>
-      ) : (
-        <Image
-          source={{ uri: entry.data.mediaUri }}
-          style={{ width, height: width }}
-          contentFit="cover"
-          transition={160}
-          onError={() => setFailed(true)}
-        />
-      )}
+      <EntryMedia kind={kind} uri={entry.data.mediaUri} size={width} active={active} />
       {/* Stacked, not side by side: at half the screen width, pixel type and a
           44px button cannot share a row, and the button ended up sitting on top
           of the vote count. */}
@@ -805,7 +835,7 @@ const styles = StyleSheet.create({
   // Nested media: parent radius (16) − padding (16), floored at 8.
   myImage: { width: '100%', aspectRatio: 1, borderRadius: 2, marginTop: space(1) },
 
-  pick: { width: 84, height: 84, borderRadius: 2, borderWidth: px.border, borderColor: colors.border },
+  pick: { width: PICK_SIZE, height: PICK_SIZE, borderRadius: 2, borderWidth: px.border, borderColor: colors.border },
   pickOn: { borderColor: colors.flame },
 
   yesterday: {
