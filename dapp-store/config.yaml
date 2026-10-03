@@ -61,16 +61,18 @@ release:
         Point the camera at something to restyle it, or stake what you made in the
         daily Arena and vote on everyone else's.
       new_in_version: >
-        The Arena now has an all-time board. Every wallet that has ever placed is
-        ranked by wins, and by what those wins were worth in SKR. It is counted
-        from the chain rather than from this device, so a reinstall never costs
-        you your record, and your own row is pinned below the list when you are
-        outside the top ten.
+        Arena rounds now rotate. Most days you shoot a photo, some days the
+        theme asks for a clip or a track. Photo days split too: on a camera
+        round only a shot you took counts, the rest are won on the description.
 
 
-        Payouts are fairer too. Each place is now paid from the pot as it stood
-        when the round closed, so the order people claim in no longer changes
-        what anyone receives.
+        The gallery shows posters now. Tap one to open it full screen with real
+        playback, and vote there. You can share your own entry from the same
+        screen.
+
+
+        Voting without a wallet used to do nothing; it now says what it needs.
+        The map has a soundtrack, off until you want it.
       saga_features: Pay-per-result with Mobile Wallet Adapter (Seed Vault).
       android_details:
         - Native Android app built for Seeker — payments via Mobile Wallet

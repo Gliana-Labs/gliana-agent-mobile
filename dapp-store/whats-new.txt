@@ -1,9 +1,9 @@
-Arena rounds now rotate their medium. Most days you still shoot a photo, but
-some days the theme asks for a short clip and some days for a track — the quest,
-the picker and the gallery all follow.
+Arena rounds now rotate. Most days you shoot a photo, some days the theme asks
+for a clip or a track. Photo days split too: on a camera round only a shot you
+took counts, the rest are won on the description.
 
-Entries are easier to judge. The grid shows still posters rather than four
-videos playing at once, and tapping one opens it full screen with real
-playback, where the vote is cast. You can share your own entry from there.
+The gallery shows posters now. Tap one to open it full screen with real
+playback, and vote there. You can share your own entry from the same screen.
 
-Voting without a wallet used to do nothing at all. It now says what it needs.
+Voting without a wallet used to do nothing; it now says what it needs. The map
+has a soundtrack, off until you want it.
