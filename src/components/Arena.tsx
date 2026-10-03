@@ -36,7 +36,7 @@ import { useWallet } from '../lib/mwa';
 import { colors, font, radius, space } from '../theme';
 import { useArena, HOLDER_THRESHOLD, type Placing } from '../arena/useArena';
 import { fetchStandings, shortAddress, type EntryWithAddress, type Standing } from '../arena/client';
-import { CLUSTER, skr, kindFor, acceptsContentType, type ThemeKind } from '../arena/config';
+import { CLUSTER, skr, kindFor, sourceFor, acceptsContentType, type ThemeKind } from '../arena/config';
 import { EntryMedia } from './arena/EntryMedia';
 import { EntryViewer } from './arena/EntryViewer';
 
@@ -167,6 +167,7 @@ function Today({
   onMake: (prompt: string) => void;
 }) {
   const left = useCountdown(arena.endsAt);
+  const source = arena.roundId !== null ? sourceFor(arena.roundId) : 'camera';
   // The "You're in" cell is full card width: a player needs a real size, not a
   // percentage, because the video and audio views measure in pixels.
   const myWidth = useWindowDimensions().width - space(6) - space(6);
@@ -185,11 +186,19 @@ function Today({
   const enterable = useMemo(
     () =>
       results
-        .filter((r) => Boolean(r.url) && acceptsContentType(kind, r.contentType))
+        // A camera round offers only what the camera produced. Without this the
+        // quest said "photograph your floor" while the picker happily accepted
+        // an image typed into the chat, which is a different contest.
+        .filter(
+          (r) =>
+            Boolean(r.url) &&
+            acceptsContentType(kind, r.contentType) &&
+            (source !== 'camera' || r.fromCamera === true),
+        )
         .slice()
         .reverse()
         .slice(0, 12),
-    [results],
+    [results, kind, source],
   );
   const [picked, setPicked] = useState<string | null>(null);
 
@@ -242,29 +251,45 @@ function Today({
               contest than who typed the better prompt. A video or music round
               has no camera step, so it leads with the composer instead. */}
           <Text style={styles.title}>
-            {kind === 'image' ? "Shoot today's theme" : kind === 'video' ? "Film today's theme" : "Score today's theme"}
+            {kind === 'video'
+              ? "Film today's theme"
+              : kind === 'music'
+                ? "Score today's theme"
+                : source === 'camera'
+                  ? "Shoot today's theme"
+                  : "Describe today's theme"}
           </Text>
           <Text style={styles.body}>
             {kind === 'image'
-              ? `Photograph something for “${arena.theme}”, pick a look, and it becomes your entry.`
+              ? source === 'camera'
+                ? `Photograph something for “${arena.theme}”, pick a look, and it becomes your entry. Today is a camera round: only a photo you took can be entered.`
+                : `No camera today — this one is won on the description alone. Write the best “${arena.theme}” you can.`
               : kind === 'video'
                 ? `Make a short clip for “${arena.theme}” — start from a photo or describe it.`
                 : `Make a track for “${arena.theme}”. It plays as an eight-second preview in the gallery.`}
             {' '}You pay for it as normal, then enter for {skr(arena.fee)} SKR.
           </Text>
-          {kind === 'image' ? (
-            <>
-              <Action label="Open the camera" busy={false} onPress={onSnap} />
-              <Press onPress={() => onMake(`Make an image: ${arena.theme}, `)} haptic="none" style={styles.linkRow}>
-                <Text style={styles.link}>or describe it instead →</Text>
-              </Press>
-            </>
+          {kind === 'image' && source === 'camera' ? (
+            // No "describe it instead" here. It undercut the whole premise of
+            // the round — the deck's claim that this beats a prompt contest is
+            // only true if the round actually asks for a photograph. Prompt
+            // contests are now their own rounds instead of a back door out of
+            // this one.
+            <Action label="Open the camera" busy={false} onPress={onSnap} />
           ) : (
             <>
               <Action
-                label={kind === 'video' ? 'Describe the clip' : 'Describe the track'}
+                label={kind === 'video' ? 'Describe the clip' : kind === 'music' ? 'Describe the track' : 'Describe it'}
                 busy={false}
-                onPress={() => onMake(kind === 'video' ? `Make a 5 second video: ${arena.theme}, ` : `Make a track: ${arena.theme}, `)}
+                onPress={() =>
+                  onMake(
+                    kind === 'video'
+                      ? `Make a 5 second video: ${arena.theme}, `
+                      : kind === 'music'
+                        ? `Make a track: ${arena.theme}, `
+                        : `Make an image: ${arena.theme}, `,
+                  )
+                }
               />
               {kind === 'video' ? (
                 <Press onPress={onSnap} haptic="none" style={styles.linkRow}>

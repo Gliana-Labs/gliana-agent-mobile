@@ -110,9 +110,22 @@ export const roundIdFor = (when: Date = new Date()): bigint =>
  */
 export type ThemeKind = 'image' | 'video' | 'music';
 
+/**
+ * Where a round's entries come from.
+ *
+ * 'camera' is the contest the Arena was built for — photograph the real thing,
+ * restyle it, and the field is grounded in what people actually saw. 'prompt'
+ * is an open contest: no photo, best description wins.
+ *
+ * Both are real contests; what is not a contest is one round containing both,
+ * which is what happened while "describe it instead" sat under a camera quest.
+ */
+export type ThemeSource = 'camera' | 'prompt';
+
 export interface Theme {
   text: string;
   kind: ThemeKind;
+  source: ThemeSource;
 }
 
 export const THEMES: Theme[] = THEME_LIST as Theme[];
@@ -123,6 +136,7 @@ export const themeFor = (roundId: bigint): string => themeAt(roundId).text;
 
 /** The medium today's round is contested in. */
 export const kindFor = (roundId: bigint): ThemeKind => themeAt(roundId).kind;
+export const sourceFor = (roundId: bigint): ThemeSource => themeAt(roundId).source;
 
 /**
  * Which generated results may be staked in a round of this kind.

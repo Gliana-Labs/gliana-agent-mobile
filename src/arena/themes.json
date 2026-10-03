@@ -1,66 +1,82 @@
 [
   {
     "text": "the oldest thing within reach",
-    "kind": "image"
+    "kind": "image",
+    "source": "camera"
   },
   {
     "text": "your desk in 2090",
-    "kind": "image"
+    "kind": "image",
+    "source": "prompt"
   },
   {
     "text": "this room, but everything is alive",
-    "kind": "video"
+    "kind": "video",
+    "source": "prompt"
   },
   {
     "text": "what you touched most today",
-    "kind": "image"
+    "kind": "image",
+    "source": "camera"
   },
   {
     "text": "something that outlived its owner",
-    "kind": "image"
+    "kind": "image",
+    "source": "prompt"
   },
   {
     "text": "your machine, transformed into a robot",
-    "kind": "image"
+    "kind": "image",
+    "source": "camera"
   },
   {
     "text": "the view from your window, 100 years on",
-    "kind": "image"
+    "kind": "image",
+    "source": "prompt"
   },
   {
     "text": "a shrine to a tangled cable",
-    "kind": "image"
+    "kind": "image",
+    "source": "camera"
   },
   {
     "text": "the chair nobody sits in",
-    "kind": "image"
+    "kind": "image",
+    "source": "prompt"
   },
   {
     "text": "your floor, as a map of somewhere",
-    "kind": "image"
+    "kind": "image",
+    "source": "camera"
   },
   {
     "text": "the last warm drink on earth",
-    "kind": "image"
+    "kind": "image",
+    "source": "prompt"
   },
   {
     "text": "the smallest thing here, enormous",
-    "kind": "image"
+    "kind": "image",
+    "source": "camera"
   },
   {
     "text": "your least photogenic corner, made holy",
-    "kind": "image"
+    "kind": "image",
+    "source": "prompt"
   },
   {
     "text": "what the light is doing right now",
-    "kind": "video"
+    "kind": "video",
+    "source": "prompt"
   },
   {
     "text": "the sound of your street, as a song",
-    "kind": "music"
+    "kind": "music",
+    "source": "prompt"
   },
   {
     "text": "what this room would sound like, awake",
-    "kind": "music"
+    "kind": "music",
+    "source": "prompt"
   }
 ]

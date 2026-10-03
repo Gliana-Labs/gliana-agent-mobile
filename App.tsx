@@ -126,7 +126,13 @@ function Main() {
   const finishedResults = useMemo(
     () =>
       conversations
-        .flatMap((c) => c.messages.map((m) => m.result))
+        // Carry the conversation's provenance onto each result, so a camera
+        // round can offer only what the camera produced.
+        .flatMap((c) =>
+          c.messages.map((m): GenerationResult | undefined =>
+            m.result ? { ...m.result, fromCamera: c.fromCamera === true } : undefined,
+          ),
+        )
         .filter((r): r is GenerationResult => Boolean(r?.url))
         .reverse(),
     [conversations],
@@ -236,6 +242,7 @@ function Main() {
       setConversations((all) => [
         {
           id,
+          fromCamera: true,
           title: style.id === 'quest' ? `Quest · ${style.hint}` : `Snap · ${style.label.toLowerCase()}`,
           messages: [
             {
