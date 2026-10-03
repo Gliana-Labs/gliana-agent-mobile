@@ -14,7 +14,7 @@
  * the thing anyone opened the app for.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 
 const MUTE_KEY = 'gliana.music.muted';
 
@@ -25,7 +25,16 @@ const MUTE_KEY = 'gliana.music.muted';
 const VOLUME = 0.22;
 
 let player: AudioPlayer | null = null;
-let muted = false;
+/**
+ * Muted until someone asks for it.
+ *
+ * Starting a soundtrack the moment an app opens is intrusive — people launch
+ * things on a bus, in an office, next to someone sleeping — and it is the kind
+ * of thing store reviews punish. The ♪ on the map is the invitation; this is
+ * the default it starts from. Also the pre-load value, so nothing plays in the
+ * gap before the stored preference arrives.
+ */
+let muted = true;
 let wanted = false;
 let ready = false;
 
@@ -48,15 +57,55 @@ export function onMusicMuteChange(fn: (muted: boolean) => void): () => void {
 export async function initMusic(): Promise<void> {
   if (ready) return;
   ready = true;
+
+  // Three steps, three catches. One try block around all of it meant a failure
+  // in any step left `player` null and the whole feature dead — which is how a
+  // rejected audio-mode call silently turned the soundtrack off.
   try {
-    muted = (await AsyncStorage.getItem(MUTE_KEY)) === '1';
+    const stored = await AsyncStorage.getItem(MUTE_KEY);
+    // No stored preference means a first run: stay muted.
+    muted = stored === null ? true : stored === '1';
     announce();
+  } catch {
+    // Default (unmuted) is fine; the toggle still works for this session.
+  }
+
+  try {
+    // initSfx sets a global audio mode for the arcade blips with
+    // playsInSilentMode false. On this hardware that policy swallows play()
+    // outright — loaded, no error, position frozen at zero, exactly as it did
+    // to the Arena's music entries.
+    await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers' });
+  } catch {
+    // Worth trying to play anyway: the mode is a preference, not a gate.
+  }
+
+  try {
+    // Tear down any previous player first. A Fast Refresh re-runs this module,
+    // and without this each reload left the old loop playing underneath the new
+    // one — two, then three copies of the same track, slightly out of phase.
+    // Harmless in a release build, which never reloads, and maddening in dev.
+    if (player) {
+      try {
+        player.remove();
+      } catch {
+        /* already gone */
+      }
+      player = null;
+    }
     player = createAudioPlayer(require('../../assets/music/map-theme.wav'));
     player.loop = true;
     player.volume = VOLUME;
+    // play() before the asset has loaded is a silent no-op in expo-audio — the
+    // same trap that made the Arena's music entries silent. Driving it from the
+    // status means it starts whenever it becomes both loaded and wanted.
+    player.addListener('playbackStatusUpdate', (status) => {
+      if (!player || !status.isLoaded) return;
+      if (wanted && !muted && !status.playing) player.play();
+    });
     if (wanted && !muted) player.play();
   } catch {
-    // No audio on this device, or storage refused. Silence is a fine outcome.
+    // No audio on this device. Silence is a fine outcome.
     player = null;
   }
 }
