@@ -26,6 +26,7 @@ export function EntryViewer({
   canVote,
   busy,
   mine,
+  connected,
   onVote,
   onClose,
 }: {
@@ -38,6 +39,8 @@ export function EntryViewer({
   busy: boolean;
   /** Your own entry. Only your own is shareable — see shareEntry. */
   mine: boolean;
+  /** Without a wallet the button asks for one instead of pretending to vote. */
+  connected: boolean;
   onVote: () => void;
   onClose: () => void;
 }) {
@@ -77,7 +80,9 @@ export function EntryViewer({
 
           {canVote ? (
             <Pressable onPress={onVote} disabled={busy} style={[st.vote, busy && st.voteBusy]}>
-              <Text style={st.voteText}>{busy ? 'Voting…' : 'Vote for this'}</Text>
+              <Text style={st.voteText}>
+                {busy ? 'Voting…' : connected ? 'Vote for this' : 'Connect to vote'}
+              </Text>
             </Pressable>
           ) : null}
 

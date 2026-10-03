@@ -110,6 +110,9 @@ function Main() {
    * thing anyone sees.
    */
   const [view, setView] = useState<'home' | 'chat'>('home');
+  // A quest prompt waiting in the composer. The nonce lets the same quest be
+  // picked twice.
+  const [prefill, setPrefill] = useState<{ text: string; n: number }>({ text: '', n: 0 });
   // The header pill earns its space by carrying today's deadline, not a label.
   const peek = usePeek();
   const [hydrated, setHydrated] = useState(false);
@@ -345,7 +348,15 @@ function Main() {
         visible={arenaOpen}
         onClose={() => setArenaOpen(false)}
         results={finishedResults}
-        onMake={(prompt) => void send(prompt)}
+        onMake={(prompt) => {
+          // Do NOT send it. The quest prompt ends mid-sentence — "Make an
+          // image: <theme>, " — for the player to finish, and firing it as-is
+          // sent a trailing comma to the agent from a screen they could not
+          // see: the arena closes onto the map, not the chat. Land on the
+          // chat with the prompt in the box and the caret at the end.
+          setView('chat');
+          setPrefill((p) => ({ text: prompt, n: p.n + 1 }));
+        }}
         onSnap={() => {
           // Leave the arena on the way to the camera: the sheet that follows a
           // shot has to land on the chat, and two modals deep is a maze.
@@ -444,7 +455,7 @@ function Main() {
 
         {view === 'chat' ? (
           <View style={{ paddingBottom: insets.bottom }}>
-            <Composer onSend={send} disabled={typing} />
+            <Composer onSend={send} disabled={typing} prefill={prefill} />
           </View>
         ) : null}
       </KeyboardAvoidingView>

@@ -130,7 +130,12 @@ export function Arena({
             }}
           />
         ) : tab === 'gallery' ? (
-          <Gallery arena={arena} me={account?.address ?? null} />
+          <Gallery
+            arena={arena}
+            me={account?.address ?? null}
+            connected={connected}
+            onConnect={connect}
+          />
         ) : tab === 'board' ? (
           <Board me={account?.address ?? null} onGoToday={() => setTab('today')} />
         ) : (
@@ -379,7 +384,17 @@ function Split() {
 
 // ── Gallery ────────────────────────────────────────────────────────────────
 
-function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string | null }) {
+function Gallery({
+  arena,
+  me,
+  connected,
+  onConnect,
+}: {
+  arena: ReturnType<typeof useArena>;
+  me: string | null;
+  connected: boolean;
+  onConnect: () => void;
+}) {
   const { width } = useWindowDimensions();
   const kind = arena.roundId !== null ? kindFor(arena.roundId) : 'image';
   // Which entry is open full screen. You cannot judge a clip in a 180px tile,
@@ -419,7 +434,12 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
             canVote={!arena.voted && open.data.entrant !== me}
             mine={open.data.entrant === me}
             busy={arena.busy}
+            connected={connected}
             onVote={() => {
+              if (!connected) {
+                onConnect();
+                return;
+              }
               const e = open;
               setOpen(null);
               void arena.vote(e.address).then(() => play('vote'), () => play('nope'));
@@ -440,7 +460,12 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
           onOpen={() => setOpen(item)}
           canVote={!arena.voted && item.data.entrant !== me}
           busy={arena.busy}
-          onVote={() => void arena.vote(item.address).then(() => play('vote'), () => play('nope'))}
+          connected={connected}
+          onVote={() =>
+            connected
+              ? void arena.vote(item.address).then(() => play('vote'), () => play('nope'))
+              : onConnect()
+          }
         />
       )}
     />
@@ -457,6 +482,7 @@ function EntryCard({
   onVote,
   kind,
   onOpen,
+  connected,
 }: {
   entry: EntryWithAddress;
   width: number;
@@ -465,6 +491,8 @@ function EntryCard({
   canVote: boolean;
   busy: boolean;
   onVote: () => void;
+  /** Without a wallet the button asks for one instead of pretending to vote. */
+  connected: boolean;
   kind: ThemeKind;
   onOpen: () => void;
 }) {
@@ -490,7 +518,7 @@ function EntryCard({
         </Text>
         {canVote ? (
           <Press onPress={onVote} disabled={busy} style={styles.voteBtn}>
-            <Text style={styles.voteText}>Vote</Text>
+            <Text style={styles.voteText}>{connected ? 'Vote' : 'Connect to vote'}</Text>
           </Press>
         ) : null}
       </View>

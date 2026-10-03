@@ -145,7 +145,13 @@ export function useArena(signer: WireSigner | null): ArenaState {
   /** Run a wallet action, then refresh — so the UI shows the chain, not a guess. */
   const act = useCallback(
     async (fn: (s: WireSigner) => Promise<string>) => {
-      if (!signer) throw new Error('Connect a wallet first');
+      if (!signer) {
+        // setError BEFORE throwing. Throwing straight out skipped it, so every
+        // action taken without a wallet failed in total silence — the button
+        // looked broken rather than gated.
+        setError('Connect a wallet first.');
+        throw new Error('Connect a wallet first');
+      }
       setBusy(true);
       setError(null);
       try {

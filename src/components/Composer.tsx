@@ -1,10 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { colors, radius, space } from '../theme';
 import { SendIcon } from './icons';
 
-export function Composer({ onSend, disabled }: { onSend: (text: string) => void; disabled?: boolean }) {
+export function Composer({
+  onSend,
+  disabled,
+  prefill,
+}: {
+  onSend: (text: string) => void;
+  disabled?: boolean;
+  /**
+   * Text dropped into the box for the person to finish, with a nonce so the
+   * SAME text can be sent in again — picking the same quest twice has to work.
+   */
+  prefill?: { text: string; n: number };
+}) {
   const [text, setText] = useState('');
+  const ref = useRef<TextInput>(null);
+  const seen = useRef(0);
+
+  useEffect(() => {
+    if (!prefill || prefill.n === seen.current) return;
+    seen.current = prefill.n;
+    setText(prefill.text);
+    // Focus, or the prompt sits there looking like a message that was already
+    // sent. The caret lands at the end, which is where the sentence is unfinished.
+    requestAnimationFrame(() => ref.current?.focus());
+  }, [prefill]);
   const canSend = text.trim().length > 0 && !disabled;
 
   function submit() {
@@ -18,6 +41,7 @@ export function Composer({ onSend, disabled }: { onSend: (text: string) => void;
     <View style={styles.wrap}>
       <View style={styles.bar}>
         <TextInput
+          ref={ref}
           style={styles.input}
           value={text}
           onChangeText={setText}
