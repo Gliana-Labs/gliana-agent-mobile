@@ -417,6 +417,7 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
             entrant={open.data.entrant}
             votes={open.data.votes}
             canVote={!arena.voted && open.data.entrant !== me}
+            mine={open.data.entrant === me}
             busy={arena.busy}
             onVote={() => {
               const e = open;

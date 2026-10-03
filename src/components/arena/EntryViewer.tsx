@@ -9,6 +9,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, Pressable, StyleSheet, useWindowDimensions, PanResponder } from 'react-native';
 import { Image } from 'expo-image';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { colors, font, radius, space } from '../../theme';
@@ -23,6 +25,7 @@ export function EntryViewer({
   votes,
   canVote,
   busy,
+  mine,
   onVote,
   onClose,
 }: {
@@ -33,6 +36,8 @@ export function EntryViewer({
   votes: number;
   canVote: boolean;
   busy: boolean;
+  /** Your own entry. Only your own is shareable — see shareEntry. */
+  mine: boolean;
   onVote: () => void;
   onClose: () => void;
 }) {
@@ -63,6 +68,12 @@ export function EntryViewer({
               {votes} {votes === 1 ? 'vote' : 'votes'}
             </Text>
           </View>
+
+          {mine ? (
+            <Pressable onPress={() => void shareEntry(uri, actual)} style={st.share}>
+              <Text style={st.shareText}>Share this</Text>
+            </Pressable>
+          ) : null}
 
           {canVote ? (
             <Pressable onPress={onVote} disabled={busy} style={[st.vote, busy && st.voteBusy]}>
@@ -246,6 +257,35 @@ function Scrubber({
   );
 }
 
+
+/**
+ * Share YOUR entry, and only yours.
+ *
+ * Everything in the gallery was made and paid for by the wallet that entered
+ * it; a share button under someone else's work would hand every viewer a copy
+ * of it to repost, which is not ours to offer. The button is absent — not
+ * disabled — on other people's entries, because a control you cannot use still
+ * suggests the app would do it for you.
+ *
+ * Shares the FILE rather than the link: the media URL is a capability (the
+ * 32-hex key is the only thing guarding it) and it expires with the seven-day
+ * R2 retention, so a posted link rots. The caption carries the store URL
+ * instead, which is the thing worth spreading.
+ */
+async function shareEntry(url: string, kind: ThemeKind) {
+  try {
+    if (!(await Sharing.isAvailableAsync())) return;
+    const ext = kind === 'video' ? 'mp4' : kind === 'music' ? 'mp3' : 'png';
+    const mime = kind === 'video' ? 'video/mp4' : kind === 'music' ? 'audio/mpeg' : 'image/png';
+    const target = `${FileSystem.cacheDirectory}gliana-arena-${Date.now()}.${ext}`;
+    const { uri } = await FileSystem.downloadAsync(url, target);
+    await Sharing.shareAsync(uri, { mimeType: mime, dialogTitle: 'Share your Arena entry' });
+  } catch {
+    // A cancelled share and a failed download both land here; neither is worth
+    // interrupting the viewer for.
+  }
+}
+
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 const st = StyleSheet.create({
@@ -254,6 +294,8 @@ const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: space(1) },
   who: { color: colors.textDim, fontSize: 12, fontFamily: font.mono },
   votes: { color: colors.text, fontSize: 11, fontFamily: font.pixel },
+  share: { paddingVertical: space(2), paddingHorizontal: space(5), borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border },
+  shareText: { color: colors.text, fontSize: 11, fontFamily: font.pixel },
   vote: { backgroundColor: colors.flame, paddingVertical: space(3), paddingHorizontal: space(8), borderRadius: radius.sm },
   voteBusy: { opacity: 0.6 },
   voteText: { color: '#0a0a0d', fontSize: 11, fontFamily: font.pixel },
