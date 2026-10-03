@@ -150,3 +150,21 @@ export const skr = (base: bigint | number): string => {
   const v = fromSkrBase(base);
   return v >= 1 ? v.toFixed(2).replace(/\.?0+$/, '') : v.toFixed(4).replace(/\.?0+$/, '');
 };
+
+/**
+ * The medium of ONE entry, read from its URL.
+ *
+ * A round has a kind, but `enter` is a permissionless instruction that takes
+ * any URI — the app only offers you matching results, a script can post
+ * anything. Rendering every entry as the round's kind put an mp3 in a video
+ * view: a black tile that played sound nobody asked for. Each cell trusts the
+ * file; the round's kind is only the fallback when the URL says nothing.
+ */
+export const kindForUri = (uri: string): ThemeKind | undefined => {
+  const ext = /\.([a-z0-9]+)(?:[?#]|$)/i.exec(uri)?.[1]?.toLowerCase();
+  if (!ext) return undefined;
+  if (['mp4', 'mov', 'webm', 'm4v'].includes(ext)) return 'video';
+  if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext)) return 'music';
+  if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'].includes(ext)) return 'image';
+  return undefined;
+};

@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { Modal, View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { colors, font, radius, space } from '../../theme';
 import type { ThemeKind } from '../../arena/config';
 import { shortAddress } from '../../arena/client';
@@ -81,10 +81,30 @@ function BigVideo({ uri, side, visible }: { uri: string; side: number; visible: 
     p.loop = true;
     p.muted = false;
   });
-  // Opening the viewer starts it; closing stops it, or audio keeps playing
-  // behind a dismissed modal.
-  if (visible) player.play();
-  else player.pause();
+  // In an effect, not in render: calling play() while rendering is a side
+  // effect React may run twice or not at all, and it is how the grid's
+  // autoplay became unreliable. Opening starts it, closing stops it — or audio
+  // keeps playing behind a dismissed modal.
+  useEffect(() => {
+    if (!visible) {
+      player.pause();
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      // initSfx sets a global playsInSilentMode:false for the arcade blips.
+      // An entry the voter opened is not a blip, and that policy silences it.
+      try {
+        await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers' });
+      } catch {
+        /* a preference, not a precondition */
+      }
+      if (!cancelled) player.play();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, player]);
   return (
     <VideoView
       player={player}
@@ -106,7 +126,19 @@ function BigAudio({ uri, side, visible }: { uri: string; side: number; visible: 
   // track and never made a sound.
   const [want, setWant] = useState(false);
   useEffect(() => {
-    if (want && loaded && !playing) player.play();
+    if (!want || !loaded || playing) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers' });
+      } catch {
+        /* a preference, not a precondition */
+      }
+      if (!cancelled) player.play();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [want, loaded, playing, player]);
   const dur = status?.duration ?? 0;
   const pos = status?.currentTime ?? 0;

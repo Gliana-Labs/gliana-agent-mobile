@@ -223,7 +223,7 @@ function Today({
           {/* Your entry, in whatever medium the round is. An <Image> here showed
               "image unavailable" over a perfectly good track. */}
           <View style={styles.myImage}>
-            <EntryMedia kind={kind} uri={arena.mine.data.mediaUri} size={myWidth} active={false} />
+            <EntryMedia kind={kind} uri={arena.mine.data.mediaUri} size={myWidth} />
           </View>
           <Text style={styles.body}>Paid {skr(arena.mine.data.paidFee)} SKR to enter.</Text>
         </Card>
@@ -294,7 +294,7 @@ function Today({
                     the same cell the gallery will — you choose the thing the
                     voters will actually see or hear. */}
                 <View style={[styles.pick, picked === item.url! && styles.pickOn, { overflow: 'hidden' }]}>
-                  <EntryMedia kind={kind} uri={item.url!} size={PICK_SIZE} active={false} />
+                  <EntryMedia kind={kind} uri={item.url!} size={PICK_SIZE} />
                 </View>
               </Press>
             )}
@@ -382,14 +382,9 @@ function Split() {
 function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string | null }) {
   const { width } = useWindowDimensions();
   const kind = arena.roundId !== null ? kindFor(arena.roundId) : 'image';
-  // Which cell is on screen, so one video plays rather than all of them.
-  const [visible, setVisible] = useState<string | null>(null);
   // Which entry is open full screen. You cannot judge a clip in a 180px tile,
   // and a vote you cannot inform is a vote nobody casts.
   const [open, setOpen] = useState<EntryWithAddress | null>(null);
-  const onViewable = useRef(({ viewableItems }: { viewableItems: { key: string }[] }) => {
-    setVisible(viewableItems[0]?.key ?? null);
-  }).current;
 
   if (arena.loading) return <Loading />;
   if (arena.entries.length === 0)
@@ -413,8 +408,6 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
         </Text>
       }
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => void arena.refresh()} tintColor={colors.flame} />}
-      onViewableItemsChanged={onViewable}
-      viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
       ListFooterComponent={
         open ? (
           <EntryViewer
@@ -443,7 +436,6 @@ function Gallery({ arena, me }: { arena: ReturnType<typeof useArena>; me: string
           rank={arena.entries.length >= 3 && item.data.votes > 0 ? index + 1 : null}
           mine={item.data.entrant === me}
           kind={kind}
-          active={visible === item.address}
           onOpen={() => setOpen(item)}
           canVote={!arena.voted && item.data.entrant !== me}
           busy={arena.busy}
@@ -463,7 +455,6 @@ function EntryCard({
   busy,
   onVote,
   kind,
-  active,
   onOpen,
 }: {
   entry: EntryWithAddress;
@@ -474,21 +465,15 @@ function EntryCard({
   busy: boolean;
   onVote: () => void;
   kind: ThemeKind;
-  /** Only the cell on screen plays: four decoders at once cooks the phone. */
-  active: boolean;
   onOpen: () => void;
 }) {
   return (
     <View style={[styles.entry, { width }, mine && styles.entryMine]}>
-      {/* The media keeps its own tap — play, or unmute — so opening needs its
-          own control. Wrapping the tile in a Pressable just lost the race to
-          the inner one and the viewer never opened. */}
-      <View>
-        <EntryMedia kind={kind} uri={entry.data.mediaUri} size={width} active={active} />
-        <Press onPress={onOpen} haptic="none" style={styles.expand}>
-          <Text style={styles.expandGlyph}>⤢</Text>
-        </Press>
-      </View>
+      {/* The whole tile opens it. The cells are posters now — nothing inside
+          competes for the tap. */}
+      <Press onPress={onOpen} haptic="none">
+        <EntryMedia kind={kind} uri={entry.data.mediaUri} size={width} />
+      </Press>
       {/* Stacked, not side by side: at half the screen width, pixel type and a
           44px button cannot share a row, and the button ended up sitting on top
           of the vote count. */}
