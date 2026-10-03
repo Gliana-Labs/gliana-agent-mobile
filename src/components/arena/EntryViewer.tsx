@@ -6,13 +6,13 @@
  * so tapping an entry opens it at full size with real playback — and the vote
  * lives here, where the decision is actually made.
  */
-import { useEffect, useState } from 'react';
-import { Modal, View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Modal, View, Text, Pressable, StyleSheet, useWindowDimensions, PanResponder } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { colors, font, radius, space } from '../../theme';
-import type { ThemeKind } from '../../arena/config';
+import { kindForUri, type ThemeKind } from '../../arena/config';
 import { shortAddress } from '../../arena/client';
 
 export function EntryViewer({
@@ -38,6 +38,10 @@ export function EntryViewer({
 }) {
   const { width, height } = useWindowDimensions();
   const side = Math.min(width - space(6), height * 0.52);
+  // The FILE decides, exactly as the grid poster does. Taking the round's kind
+  // here rendered a clip and a track as <Image> — the modal opened on a still
+  // nothing could play, which is not a playback bug but a routing one.
+  const actual = kindForUri(uri) ?? kind;
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -45,9 +49,9 @@ export function EntryViewer({
         {/* The sheet swallows taps so a press on the media never closes it —
             tapping a video is how you unmute it. */}
         <Pressable style={st.sheet} onPress={() => {}}>
-          {kind === 'video' ? (
+          {actual === 'video' ? (
             <BigVideo uri={uri} side={side} visible={visible} />
-          ) : kind === 'music' ? (
+          ) : actual === 'music' ? (
             <BigAudio uri={uri} side={side} visible={visible} />
           ) : (
             <Image source={{ uri }} style={{ width: side, height: side, borderRadius: radius.sm }} contentFit="contain" />
@@ -105,12 +109,20 @@ function BigVideo({ uri, side, visible }: { uri: string; side: number; visible: 
       cancelled = true;
     };
   }, [visible, player]);
+  // NATIVE controls, and nothing wrapped around them.
+  //
+  // They give play, pause and click-to-seek for free, which a hand-rolled bar
+  // took three goes to get wrong: VideoView swallows touches on Android, so a
+  // Pressable around it never fires — that is why the controls looked like
+  // they "weren't showing" and why pause did nothing. The control surface has
+  // to BE the video, not a layer over it.
   return (
     <VideoView
       player={player}
       style={{ width: side, height: side, borderRadius: radius.sm }}
       contentFit="contain"
       nativeControls
+      allowsPictureInPicture={false}
     />
   );
 }
@@ -161,11 +173,74 @@ function BigAudio({ uri, side, visible }: { uri: string; side: number; visible: 
       >
         <Text style={st.playGlyph}>{playing ? '❚❚' : want ? '…' : '▶'}</Text>
       </Pressable>
-      <View style={st.track}>
-        <View style={[st.trackFill, { width: `${pct}%` }]} />
+      <Scrubber position={pos} duration={dur} onSeek={(t) => void player.seekTo(t)} />
+    </View>
+  );
+}
+
+
+/**
+ * Tap or drag anywhere on the bar to seek.
+ *
+ * expo-video's native controls are an overlay that has to be summoned and did
+ * not survive being inside the modal, and a progress bar you cannot move is
+ * just decoration — if someone is judging a clip they will want to go back to
+ * the bit that mattered.
+ */
+function Scrubber({
+  position,
+  duration,
+  onSeek,
+}: {
+  position: number;
+  duration: number;
+  onSeek: (seconds: number) => void;
+}) {
+  const [width, setWidth] = useState(0);
+  // While dragging, the thumb follows the finger rather than the player, or it
+  // snaps back on every status tick until the seek lands.
+  const [dragging, setDragging] = useState<number | null>(null);
+  const at = (x: number) => {
+    if (width <= 0 || duration <= 0) return 0;
+    return Math.max(0, Math.min(1, x / width)) * duration;
+  };
+  const shown = dragging ?? position;
+  const pct = duration > 0 ? Math.min(100, (shown / duration) * 100) : 0;
+
+  // Rebuilt when the measurement or the duration changes: the handlers close
+  // over both, and a bar measured at zero would seek to zero forever.
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (e) => setDragging(at(e.nativeEvent.locationX)),
+        onPanResponderMove: (e) => setDragging(at(e.nativeEvent.locationX)),
+        onPanResponderRelease: (e) => {
+          const t = at(e.nativeEvent.locationX);
+          setDragging(null);
+          onSeek(t);
+        },
+        onPanResponderTerminate: () => setDragging(null),
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [width, duration, onSeek],
+  );
+
+  return (
+    <View style={st.scrubWrap}>
+      <View
+        style={st.scrubHit}
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+        {...responder.panHandlers}
+      >
+        <View style={st.track}>
+          <View style={[st.trackFill, { width: `${pct}%` }]} />
+        </View>
+        <View style={[st.thumb, { left: `${pct}%` }]} />
       </View>
       <Text style={st.time}>
-        {fmt(pos)} / {dur > 0 ? fmt(dur) : '--:--'}
+        {fmt(shown)} / {duration > 0 ? fmt(duration) : '--:--'}
       </Text>
     </View>
   );
@@ -174,7 +249,7 @@ function BigAudio({ uri, side, visible }: { uri: string; side: number; visible: 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 const st = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.86)', alignItems: 'center', justifyContent: 'center', padding: space(3) },
+  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.96)', alignItems: 'center', justifyContent: 'center', padding: space(3) },
   sheet: { alignItems: 'center', gap: space(3) },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: space(1) },
   who: { color: colors.textDim, fontSize: 12, fontFamily: font.mono },
@@ -187,7 +262,10 @@ const st = StyleSheet.create({
   audio: { alignItems: 'center', justifyContent: 'center', gap: space(4), backgroundColor: colors.surface, borderRadius: radius.sm },
   playBtn: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.surfaceStrong, alignItems: 'center', justifyContent: 'center' },
   playGlyph: { color: colors.flame, fontSize: 26 },
-  track: { width: '70%', height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
-  trackFill: { height: 4, backgroundColor: colors.flame },
+  scrubWrap: { width: '100%', alignItems: 'center', gap: space(2) },
+  scrubHit: { width: '86%', height: 28, justifyContent: 'center' },
+  thumb: { position: 'absolute', width: 14, height: 14, borderRadius: 7, backgroundColor: colors.flame, marginLeft: -7 },
+  track: { width: '100%', height: 5, backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 3, overflow: 'hidden' },
+  trackFill: { height: 5, backgroundColor: colors.flame },
   time: { color: colors.textDim, fontSize: 11, fontFamily: font.mono },
 });

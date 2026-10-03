@@ -61,13 +61,20 @@ function VideoPoster({ uri, size }: { uri: string; size: number }) {
   });
   return (
     <View style={{ width: size, height: size }}>
-      <VideoView
-        player={player}
-        style={{ width: size, height: size }}
-        contentFit="cover"
-        nativeControls={false}
-        allowsPictureInPicture={false}
-      />
+      {/* pointerEvents none, or the tile is dead to the touch. VideoView
+          swallows taps on Android: only the badge — a plain View on top — was
+          letting the press reach the tile, so the poster opened the viewer
+          just from its bottom-left corner. It is a still here; it has nothing
+          to handle. */}
+      <View pointerEvents="none" style={{ width: size, height: size }}>
+        <VideoView
+          player={player}
+          style={{ width: size, height: size }}
+          contentFit="cover"
+          nativeControls={false}
+          allowsPictureInPicture={false}
+        />
+      </View>
       <Badge text="▶  VIDEO" />
     </View>
   );
