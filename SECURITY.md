@@ -64,6 +64,19 @@ downgrade that would break the application outright. The non-forced fix still
 rewrites 148 packages, which is not a change to make between building a release
 APK and submitting it.
 
+### The Anchor program's own lockfile
+
+`program/arena/package-lock.json` reports 6 high advisories: `bigint-buffer`
+(buffer overflow via `toBigIntLE`) and `toml` (uncontrolled recursion), reached
+through `@coral-xyz/anchor`, `@solana/spl-token` and `anchor-litesvm`.
+
+That lockfile is the **test harness**, not the program. The on-chain program is
+Rust, compiled with `cargo build-sbf`; these JavaScript packages run LiteSVM
+tests on a developer's machine and are present in neither the deployed program
+nor the APK. `npm audit fix` reports "up to date" — it can fix none of them —
+and `--force` resolves by installing `@solana/spl-token@0.1.8`, a 2021 release
+that would break the tests outright.
+
 The correct fix is upstream: these clear when Expo and React Native bump their
 own toolchain. Planned for after the submission window, with a full rebuild and
 device test rather than a lockfile edit.
