@@ -265,7 +265,7 @@ function Today({
                 ? `Photograph something for “${arena.theme}”, pick a look, and it becomes your entry. Today is a camera round: only a photo you took can be entered.`
                 : `No camera today — this one is won on the description alone. Write the best “${arena.theme}” you can.`
               : kind === 'video'
-                ? `Make a short clip for “${arena.theme}” — start from a photo or describe it.`
+                ? `Describe a short clip for “${arena.theme}”.`
                 : `Make a track for “${arena.theme}”. It plays as an eight-second preview in the gallery.`}
             {' '}You pay for it as normal, then enter for {skr(arena.fee)} SKR.
           </Text>
@@ -291,11 +291,7 @@ function Today({
                   )
                 }
               />
-              {kind === 'video' ? (
-                <Press onPress={onSnap} haptic="none" style={styles.linkRow}>
-                  <Text style={styles.link}>or shoot a photo to animate →</Text>
-                </Press>
-              ) : null}
+
             </>
           )}
         </Card>

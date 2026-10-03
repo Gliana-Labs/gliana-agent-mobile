@@ -21,6 +21,16 @@ import { API, quote, type Proposal } from './api';
  * both borrow a look; kontext keeps your subject and changes the world around
  * it, which is what "make my desk 8-bit" means.
  */
+/**
+ * The camera path is an IMAGE editor, and only that.
+ *
+ * It cannot produce video or audio, so a video or music round has no camera
+ * step — the Arena's quest offered "shoot a photo to animate" for a while, and
+ * it charged for a still the round then refused, because the picker only takes
+ * media matching the round's medium. If that link ever comes back, this model
+ * has to change with it (an image-to-video model, priced and guarded like any
+ * other paid call).
+ */
 export const SNAP_MODEL = 'flux-1-kontext-pro';
 const SNAP_FIELD = 'input_image';
 
