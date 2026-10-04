@@ -33,17 +33,22 @@ jobs:
             ~/.cargo/git
             ~/.local/share/solana
             program/arena/target
-          key: sbf-3.0.15-${{ runner.os }}-${{ hashFiles('program/arena/Cargo.lock') }}
+          key: sbf-2.1.21-${{ runner.os }}-${{ hashFiles('program/arena/Cargo.lock') }}
 
-      # PINNED, not "stable". The SBF version cargo-build-sbf emits moves with the
-      # toolchain, and litesvm 0.3.3 rejects a program built by a newer one with
-      # "Failed to add program: invalid account data for instruction" — all 17
-      # tests failing at load, which reads like the program is broken rather
-      # than the compiler being too new. 3.0.15 is what this program is
-      # developed and deployed with.
-      - name: Install the Solana toolchain (3.0.15)
+      # PINNED, and pinned DOWN. The SBF version cargo-build-sbf emits follows
+      # the toolchain, and litesvm 0.3.3 rejects anything newer than it
+      # understands: "stable" compiled the program fine and then failed all 17
+      # tests at load with "invalid account data for instruction", which reads
+      # as a broken program rather than a compiler that moved.
+      #
+      # Upgrading litesvm instead is the better long-term answer, but 1.5.0
+      # fails all 17 on its own API changes, so that is a deliberate piece of
+      # work and not a lockfile bump. Until then CI builds with a toolchain the
+      # harness can load. Note this is OLDER than the 3.0.15 used to deploy, so
+      # CI proves the program's behaviour, not its exact deployed bytes.
+      - name: Install the Solana toolchain (2.1.21)
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v3.0.15/install)"
+          sh -c "$(curl -sSfL https://release.anza.xyz/v2.1.21/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
 
       - name: Build the program
