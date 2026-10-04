@@ -33,7 +33,7 @@ jobs:
             ~/.cargo/git
             ~/.local/share/solana
             program/arena/target
-          key: sbf-2.1.21-${{ runner.os }}-${{ hashFiles('program/arena/Cargo.lock') }}
+          key: sbf-2.2.20-${{ runner.os }}-${{ hashFiles('program/arena/Cargo.lock') }}
 
       # PINNED, and pinned DOWN. The SBF version cargo-build-sbf emits follows
       # the toolchain, and litesvm 0.3.3 rejects anything newer than it
@@ -46,9 +46,9 @@ jobs:
       # work and not a lockfile bump. Until then CI builds with a toolchain the
       # harness can load. Note this is OLDER than the 3.0.15 used to deploy, so
       # CI proves the program's behaviour, not its exact deployed bytes.
-      - name: Install the Solana toolchain (2.1.21)
+      - name: Install the Solana toolchain (2.2.20)
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v2.1.21/install)"
+          sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.20/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
 
       - name: Build the program
