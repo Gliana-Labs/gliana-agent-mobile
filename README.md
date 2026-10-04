@@ -110,9 +110,23 @@ second.
 ```bash
 cd program/arena
 npm install
-cargo build-sbf          # produces target/deploy/arena.so, which the tests load
+npm test                 # loads the committed arena.so — no Solana toolchain needed
+```
+
+**If you change `programs/arena/src`, rebuild and recommit the binary**, or the
+tests keep passing against the previous one:
+
+```bash
+cargo build-sbf
+cp target/deploy/arena.so arena.so
 npm test
 ```
+
+The compiled program is committed because `cargo-build-sbf` emits an SBF version
+that follows the toolchain, and litesvm 0.3.3 executes only a narrow range of
+them — so the binary under test is the binary that is deployed, byte for byte.
+CI compiles the source separately and warns when the source has moved on without
+the artefact.
 
 All 17 pass, and they are named after the rules they defend rather than the
 functions they call:
