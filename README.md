@@ -90,10 +90,15 @@ same device/emulator before connecting a wallet.
 
 [![CI](https://github.com/Gliana-Labs/gliana-agent-mobile/actions/workflows/ci.yml/badge.svg)](https://github.com/Gliana-Labs/gliana-agent-mobile/actions/workflows/ci.yml)
 
-Every push runs the program's tests, typechecks the app, and probes the live
-paid path. The wallet flow is the one thing CI cannot reach — Mobile Wallet
-Adapter needs a device, a wallet app and Seed Vault — so that is evidenced by
-the demo video instead.
+Every push compiles the Anchor program, typechecks the app, and probes the live
+paid path.
+
+Two things CI cannot do, stated rather than implied. **The wallet flow** needs a
+device, a wallet app and Seed Vault, so it is evidenced by the demo video.
+**The program's 17 tests** run locally in under a second but crash a hosted
+runner — litesvm 0.3.3 is a native addon that aborts the worker after three
+tests on GitHub's images, with the same binary that passes locally. Run them
+yourself with the two commands below; it takes about a second.
 
 Three things can be checked without a phone, a wallet or our servers.
 
