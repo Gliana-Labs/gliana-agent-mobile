@@ -15,12 +15,17 @@ on:
 jobs:
   program:
     name: Anchor program (17 LiteSVM tests)
-    runs-on: ubuntu-latest
+    # 22.04 and Node 20 on purpose. litesvm 0.3.3 is a native addon; on
+    # ubuntu-latest with Node 22 it loads the program, passes three tests and
+    # then takes the worker down with SIGABRT — with the same committed binary
+    # that passes all 17 locally in under a second. That is the runtime, not the
+    # program.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
       # No Solana toolchain here on purpose. The tests load program/arena/arena.so,
       # which is committed: cargo-build-sbf emits an SBF version that follows the
