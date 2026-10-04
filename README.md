@@ -88,6 +88,13 @@ same device/emulator before connecting a wallet.
 
 ## Verify it yourself
 
+[![CI](https://github.com/Gliana-Labs/gliana-agent-mobile/actions/workflows/ci.yml/badge.svg)](https://github.com/Gliana-Labs/gliana-agent-mobile/actions/workflows/ci.yml)
+
+Every push runs the program's tests, typechecks the app, and probes the live
+paid path. The wallet flow is the one thing CI cannot reach — Mobile Wallet
+Adapter needs a device, a wallet app and Seed Vault — so that is evidenced by
+the demo video instead.
+
 Three things can be checked without a phone, a wallet or our servers.
 
 ### 1. The Anchor program, against its own tests

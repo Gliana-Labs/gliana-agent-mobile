@@ -1,0 +1,89 @@
+# What a reviewer can check without taking our word for it.
+#
+# The app itself cannot be tested here — Mobile Wallet Adapter needs a device, a
+# wallet app and Seed Vault, so the wallet flow is evidenced by the demo video
+# and the screenshots in the README instead. Everything that does NOT need
+# hardware runs on every push.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  program:
+    name: Anchor program (17 LiteSVM tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The toolchain is pinned by program/arena/rust-toolchain.toml (1.89.0);
+      # this step only has to exist so cargo honours it.
+      - name: Cache cargo and the SBF toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.local/share/solana
+            program/arena/target
+          key: sbf-${{ runner.os }}-${{ hashFiles('program/arena/Cargo.lock') }}
+
+      - name: Install the Solana toolchain
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Build the program
+        working-directory: program/arena
+        run: cargo build-sbf
+
+      - name: Test the program
+        working-directory: program/arena
+        run: |
+          npm ci
+          npm test
+
+  typecheck:
+    name: App typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  gateway:
+    name: The paid path is live (informational)
+    runs-on: ubuntu-latest
+    # Informational on purpose: this probes a running service, so a red mark
+    # here would mean the gateway is down rather than that this commit is
+    # broken. It is here because "no account, pay per call" is the central
+    # claim, and a claim worth making is worth probing.
+    continue-on-error: true
+    steps:
+      - name: The catalog the app reads
+        run: |
+          # /v1/models returns {"models": [...]}, not a bare array — len() on
+          # the response itself counts the keys and reports 1.
+          n=$(curl -sf --max-time 30 https://api.glianalabs.com/v1/models | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["models"]))')
+          echo "models served: $n"
+          test "$n" -gt 100
+
+      - name: An unpaid call is refused with 402, not 200
+        run: |
+          code=$(curl -s -o /tmp/body -w '%{http_code}' --max-time 30 \
+            -X POST https://api.glianalabs.com/v1/infer \
+            -H 'content-type: application/json' \
+            -d '{"model":"krea-2-medium-turbo","prompt":"a paper crane"}')
+          echo "status: $code"
+          head -c 300 /tmp/body; echo
+          test "$code" = "402"
