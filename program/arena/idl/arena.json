@@ -1,0 +1,669 @@
+{
+  "address": "2CdzdzR1hj6w1ZjXLgvk3o2Saq5sXd1ufQ3Toww4PPHQ",
+  "metadata": {
+    "name": "arena",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "claim_place",
+      "docs": [
+        "Pay a winning place out of the vault. Permissionless once the round has",
+        "ended; the caller passes the entry and its place, and the program checks",
+        "the claim rather than trusting it.",
+        "",
+        "Split into per-claim payouts rather than one `settle` that pays everyone:",
+        "a single instruction would need every winner's token account in one",
+        "transaction, which caps a round's size at whatever fits in 1232 bytes.",
+        "Each payout is idempotent — `paid` on the Entry is the guard."
+      ],
+      "discriminator": [
+        133,
+        187,
+        4,
+        239,
+        238,
+        46,
+        218,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        },
+        {
+          "name": "entry",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "winner_tokens",
+          "docs": [
+            "Must belong to the entrant being paid — otherwise anyone could claim a",
+            "winner's place into their own account."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "place",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "create_round",
+      "docs": [
+        "Open a round. Anyone may create one; the app creates the daily round, but",
+        "nothing here privileges us — `authority` only earns the right to claim",
+        "back rent on an EMPTY round (see `close_empty_round`)."
+      ],
+      "discriminator": [
+        229,
+        218,
+        236,
+        169,
+        231,
+        80,
+        134,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "The pot. Owned by the round PDA, so only `claim_place` can move it."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        },
+        {
+          "name": "theme",
+          "type": "string"
+        },
+        {
+          "name": "entry_fee",
+          "type": "u64"
+        },
+        {
+          "name": "ends_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "enter",
+      "docs": [
+        "Enter the round: pay the fee into the vault and record the media URL.",
+        "",
+        "The app calls this only AFTER a generation succeeded. A model that fails",
+        "must never cost an entry fee — the same charge-then-fail rule the gateway",
+        "is built around."
+      ],
+      "discriminator": [
+        139,
+        49,
+        209,
+        114,
+        88,
+        91,
+        77,
+        134
+      ],
+      "accounts": [
+        {
+          "name": "entrant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        },
+        {
+          "name": "entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  110,
+                  116,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round"
+              },
+              {
+                "kind": "account",
+                "path": "entrant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Checked against the round's own vault key so a caller cannot pay their",
+            "fee into an account they control and still get an entry."
+          ],
+          "writable": true
+        },
+        {
+          "name": "entrant_tokens",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "media_uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "vote",
+      "docs": [
+        "Vote for an entry. Free, and one per wallet per round: the Vote PDA is",
+        "seeded on (round, voter), so a second vote cannot be initialised at all.",
+        "",
+        "`rank_at_vote` records how many votes the entry already had. That is what",
+        "makes \"early voters\" meaningful at settle time without storing a list."
+      ],
+      "discriminator": [
+        227,
+        110,
+        155,
+        23,
+        136,
+        126,
+        172,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "voter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        },
+        {
+          "name": "entry",
+          "writable": true
+        },
+        {
+          "name": "vote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Entry",
+      "discriminator": [
+        63,
+        18,
+        152,
+        113,
+        215,
+        246,
+        221,
+        250
+      ]
+    },
+    {
+      "name": "Round",
+      "discriminator": [
+        87,
+        127,
+        165,
+        51,
+        73,
+        78,
+        116,
+        174
+      ]
+    },
+    {
+      "name": "Vote",
+      "discriminator": [
+        96,
+        91,
+        104,
+        57,
+        145,
+        35,
+        172,
+        155
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ThemeTooLong",
+      "msg": "Theme is too long"
+    },
+    {
+      "code": 6001,
+      "name": "UriTooLong",
+      "msg": "Media URI is too long"
+    },
+    {
+      "code": 6002,
+      "name": "FeeTooSmall",
+      "msg": "Entry fee must be greater than zero"
+    },
+    {
+      "code": 6003,
+      "name": "EndsInThePast",
+      "msg": "Round must end in the future"
+    },
+    {
+      "code": 6004,
+      "name": "RoundTooLong",
+      "msg": "Round runs for too long"
+    },
+    {
+      "code": 6005,
+      "name": "RoundSettled",
+      "msg": "Round has already been settled"
+    },
+    {
+      "code": 6006,
+      "name": "RoundClosed",
+      "msg": "Round is closed"
+    },
+    {
+      "code": 6007,
+      "name": "RoundOpen",
+      "msg": "Round has not ended yet"
+    },
+    {
+      "code": 6008,
+      "name": "WrongRound",
+      "msg": "Entry belongs to a different round"
+    },
+    {
+      "code": 6009,
+      "name": "WrongMint",
+      "msg": "Token account is for the wrong mint"
+    },
+    {
+      "code": 6010,
+      "name": "SelfVote",
+      "msg": "You cannot vote for your own entry"
+    },
+    {
+      "code": 6011,
+      "name": "AlreadyPaid",
+      "msg": "This entry has already been paid"
+    },
+    {
+      "code": 6012,
+      "name": "BadPlace",
+      "msg": "Place must be between 1 and 5"
+    },
+    {
+      "code": 6013,
+      "name": "NothingToPay",
+      "msg": "Nothing to pay"
+    },
+    {
+      "code": 6014,
+      "name": "NotThisPlace",
+      "msg": "This entry did not take that place"
+    },
+    {
+      "code": 6015,
+      "name": "WrongWinnerAccount",
+      "msg": "Payout account does not belong to the entrant"
+    },
+    {
+      "code": 6016,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    }
+  ],
+  "types": [
+    {
+      "name": "Entry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "pubkey"
+          },
+          {
+            "name": "entrant",
+            "type": "pubkey"
+          },
+          {
+            "name": "media_uri",
+            "type": "string"
+          },
+          {
+            "name": "votes",
+            "type": "u32"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "paid",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "paid_fee",
+            "docs": [
+              "What this entrant actually paid — face value, or the holder rate. Stored",
+              "so the gallery can show it without re-deriving a discount it cannot see."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Round",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "theme",
+            "type": "string"
+          },
+          {
+            "name": "entry_fee",
+            "type": "u64"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "entry_count",
+            "type": "u32"
+          },
+          {
+            "name": "settled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "top",
+            "docs": [
+              "The leaderboard, maintained on every vote.",
+              "",
+              "WHY IT LIVES HERE. `claim_place` takes the place from its caller, and",
+              "checking that claim needs to know who actually won. Ranking at claim",
+              "time would mean passing every entry in the round into one transaction,",
+              "which caps a round at whatever fits in 1232 bytes. Ranking at VOTE time",
+              "is five comparisons and bounds the cost per vote instead.",
+              "",
+              "Without this the program has a hole big enough to empty the vault:",
+              "anyone could claim place 1 for their own entry, no votes required."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                5
+              ]
+            }
+          },
+          {
+            "name": "top_votes",
+            "type": {
+              "array": [
+                "u32",
+                5
+              ]
+            }
+          },
+          {
+            "name": "pot",
+            "docs": [
+              "The pot as it stood when the first place was claimed, in token base",
+              "units. Zero until then. Every payout divides this, never the live vault",
+              "balance, so the split does not depend on who claims first."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Vote",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "pubkey"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "entry",
+            "type": "pubkey"
+          },
+          {
+            "name": "rank_at_vote",
+            "docs": [
+              "Votes the entry already had when this vote landed — \"early\" is this",
+              "number being low, which is what the voter share rewards."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

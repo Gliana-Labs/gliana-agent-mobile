@@ -14,7 +14,13 @@ import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { AccountLayout, MintLayout, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { readFileSync } from 'node:fs';
 
-const idl = JSON.parse(readFileSync(new URL('../target/idl/arena.json', import.meta.url), 'utf8')) as Idl;
+// The IDL is committed at ../idl/arena.json rather than read from target/.
+// `cargo build-sbf` does not emit an IDL — only `anchor build` does — so a
+// checkout that had compiled the program still had no IDL and the tests could
+// not run. It is also a published interface (it lives on-chain as program
+// metadata), which makes it something a change should surface in review rather
+// than a disposable build output.
+const idl = JSON.parse(readFileSync(new URL('../idl/arena.json', import.meta.url), 'utf8')) as Idl;
 const PROGRAM_ID = new PublicKey(idl.address);
 const SO = new URL('../target/deploy/arena.so', import.meta.url);
 
