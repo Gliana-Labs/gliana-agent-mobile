@@ -22,7 +22,20 @@ import { readFileSync } from 'node:fs';
 // than a disposable build output.
 const idl = JSON.parse(readFileSync(new URL('../idl/arena.json', import.meta.url), 'utf8')) as Idl;
 const PROGRAM_ID = new PublicKey(idl.address);
-const SO = new URL('../target/deploy/arena.so', import.meta.url);
+// The compiled program is committed next to its IDL.
+//
+// cargo-build-sbf emits an SBF version that follows the toolchain, and litesvm
+// 0.3.3 only executes a narrow range of them: a newer toolchain builds a
+// program it refuses to load, an older one ships a rustc the dependency tree
+// rejects, and one in between loaded but aborted the process mid-run. Pinning
+// CI to a version that satisfies all three may not be possible.
+//
+// So the binary under test is the binary that is deployed, byte for byte.
+// REBUILD AND RECOMMIT IT when programs/arena/src changes — `cargo build-sbf &&
+// cp target/deploy/arena.so arena.so` — because these tests will otherwise keep
+// passing against the previous one. CI compiles the source separately to prove
+// it still builds.
+const SO = new URL('../arena.so', import.meta.url);
 
 /** SKR is 6-decimal, so these fees read like the real thing: 5 SKR. */
 const DECIMALS = 6;

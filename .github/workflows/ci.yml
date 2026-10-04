@@ -18,13 +18,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # The toolchain is pinned by program/arena/rust-toolchain.toml (1.89.0);
-      # this step only has to exist so cargo honours it.
+      # No Solana toolchain here on purpose. The tests load program/arena/arena.so,
+      # which is committed: cargo-build-sbf emits an SBF version that follows the
+      # toolchain and litesvm 0.3.3 executes only a narrow range of them. A newer
+      # toolchain built a program it refused to load; 2.1.21 shipped a rustc the
+      # dependency tree rejected; 2.2.20 loaded and then aborted the process
+      # mid-run. The binary under test is therefore the binary that is deployed,
+      # and `compiles` below proves the source still builds.
+      - name: Test the program
+        working-directory: program/arena
+        run: |
+          npm ci
+          npm test
+
+  compiles:
+    name: The program still compiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Cache cargo and the SBF toolchain
         uses: actions/cache@v4
         with:
@@ -33,40 +49,34 @@ jobs:
             ~/.cargo/git
             ~/.local/share/solana
             program/arena/target
-          key: sbf-2.2.20-${{ runner.os }}-${{ hashFiles('program/arena/Cargo.lock') }}
+          key: sbf-stable-${{ runner.os }}-${{ hashFiles('program/arena/Cargo.lock') }}
 
-      # PINNED, and pinned DOWN. The SBF version cargo-build-sbf emits follows
-      # the toolchain, and litesvm 0.3.3 rejects anything newer than it
-      # understands: "stable" compiled the program fine and then failed all 17
-      # tests at load with "invalid account data for instruction", which reads
-      # as a broken program rather than a compiler that moved.
-      #
-      # Upgrading litesvm instead is the better long-term answer, but 1.5.0
-      # fails all 17 on its own API changes, so that is a deliberate piece of
-      # work and not a lockfile bump. Until then CI builds with a toolchain the
-      # harness can load. Note this is OLDER than the 3.0.15 used to deploy, so
-      # CI proves the program's behaviour, not its exact deployed bytes.
-      - name: Install the Solana toolchain (2.2.20)
+      - name: Install the Solana toolchain
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.20/install)"
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
 
-      - name: Build the program
-        working-directory: program/arena
-        run: cargo build-sbf
-
-      - name: Show what was built
+      - name: Build
         working-directory: program/arena
         run: |
-          ls -la target/deploy/
-          file target/deploy/arena.so
           cargo-build-sbf --version
+          cargo build-sbf
+          ls -la target/deploy/arena.so
 
-      - name: Test the program
+      # A source change that is never recompiled into the committed binary would
+      # leave the tests passing against the old one. This cannot compare bytes —
+      # a different toolchain produces a different object — but it can say when
+      # the source has moved on without the artefact.
+      - name: Warn if the committed binary looks stale
         working-directory: program/arena
         run: |
-          npm ci
-          npm test
+          src=$(git log -1 --format=%ct -- programs/arena/src)
+          bin=$(git log -1 --format=%ct -- arena.so)
+          echo "last source change: $(date -d @$src)"
+          echo "last binary change: $(date -d @$bin)"
+          if [ "$src" -gt "$bin" ]; then
+            echo "::warning::programs/arena/src changed after arena.so was last committed — rebuild with 'cargo build-sbf && cp target/deploy/arena.so arena.so' so the tests run against current code."
+          fi
 
   typecheck:
     name: App typecheck
