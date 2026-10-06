@@ -94,7 +94,10 @@ Every push compiles the Anchor program, typechecks the app, and probes the live
 paid path.
 
 Two things CI cannot do, stated rather than implied. **The wallet flow** needs a
-device, a wallet app and Seed Vault, so it is evidenced by the demo video.
+device, a wallet app and Seed Vault, so it is evidenced by the demo video and by
+[`docs/DEVICE-TESTS.md`](docs/DEVICE-TESTS.md) — the published 1.1.3 APK run on
+a Solana Mobile **Seeker**, screenshot by screenshot, with the signing steps
+backed by the mainnet transactions they produced.
 **The program's 17 tests** run locally in under a second but crash a hosted
 runner — litesvm 0.3.3 is a native addon that aborts the worker after three
 tests on GitHub's images, with the same binary that passes locally. Run them
