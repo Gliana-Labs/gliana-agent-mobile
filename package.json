@@ -59,5 +59,14 @@
     "arena:state": "tsx scripts/arena-state.ts",
     "arena:board": "tsx scripts/arena-board.ts"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "ws": "^8.22.0",
+    "@xmldom/xmldom": "^0.9.12",
+    "browserslist": "^4.29.3",
+    "shell-quote": "^1.12.0",
+    "postcss": "^8.5.29",
+    "brace-expansion": "^5.0.12",
+    "@toon-format/toon": "^2.3.1"
+  }
 }
