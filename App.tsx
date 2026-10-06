@@ -432,6 +432,9 @@ function Main() {
         {view === 'home' ? (
           <Home
             peek={peek}
+            // Nothing made yet: the signpost becomes the way IN rather than the
+            // way to a contest you cannot enter.
+            firstRun={finishedResults.length === 0}
             onArena={() => setArenaOpen(true)}
             onShowcase={() => setShowcaseOpen(true)}
             onMenu={() => setSidebarOpen(true)}
@@ -517,6 +520,7 @@ function Main() {
  */
 function Home({
   peek,
+  firstRun,
   onArena,
   onShowcase,
   onMenu,
@@ -527,6 +531,8 @@ function Home({
   snapError,
 }: {
   peek: Peek;
+  /** This person has never generated anything. See the signpost below. */
+  firstRun: boolean;
   onArena: () => void;
   onShowcase: () => void;
   onMenu: () => void;
@@ -629,14 +635,25 @@ function Home({
               that takes you to the round it describes. Opaque wood-dark fill and
               a hard bottom edge, so it reads as a thing rather than a panel
               floating over the art. */}
-          <Pressable style={styles.quest} onPress={onArena}>
+          {/* On a first run this points at the CAMERA, not the Arena.
+              The signpost always described the round and always opened it,
+              which is the one place a new arrival can do nothing: entering
+              needs something you have already made and paid for. So before
+              anything exists it is the first step of the path instead —
+              photograph the theme — and it goes back to being the round's
+              signpost the moment there is a result to enter. */}
+          <Pressable style={styles.quest} onPress={firstRun ? onSnap : onArena}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.questLabel}>TODAY'S QUEST</Text>
+              <Text style={styles.questLabel}>{firstRun ? 'START HERE' : "TODAY'S QUEST"}</Text>
               <Text style={styles.questText} numberOfLines={2}>
                 {peek.theme}
               </Text>
               <Text style={styles.questMeta}>
-                {peek.open ? `${peek.entries} entered · ${left ?? 'closing'} left` : 'no round open yet'}
+                {firstRun
+                  ? 'photograph it — the price is shown before anything runs'
+                  : peek.open
+                    ? `${peek.entries} entered · ${left ?? 'closing'} left`
+                    : 'no round open yet'}
               </Text>
             </View>
             <Text style={styles.questChevron}>›</Text>
